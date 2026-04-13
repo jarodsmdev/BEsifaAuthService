@@ -1,0 +1,20 @@
+# Renombra este archivo a .env y completa las variables de entorno correctamente. Este archivo no debe ser subido a repositorios públicos ya que contiene información sensible.
+
+# ============================================
+# DATABASE
+# ============================================
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=nombre_de_tu_base_de_datos
+DB_USER=usuario_de_tu_base_de_datos
+DB_PASSWORD=password_de_tu_base_de_datos
+
+# ============================================
+# APP
+# ============================================
+SERVER_PORT=8080
+
+# ============================================
+# SECURITY
+# ============================================
+BCRYPT_STRENGTH=10
