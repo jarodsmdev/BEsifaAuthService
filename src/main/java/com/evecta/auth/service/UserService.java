@@ -1,18 +1,21 @@
 package com.evecta.auth.service;
 
-import com.evecta.auth.dto.RutValidator;
-import com.evecta.auth.dto.UserCreateDTO;
-import com.evecta.auth.dto.UserResponseDTO;
-import com.evecta.auth.model.UserEntity;
-import com.evecta.auth.repository.IUserRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import com.evecta.auth.dto.RutValidator;
+import com.evecta.auth.dto.user.UserCreateDTO;
+import com.evecta.auth.dto.user.UserResponseDTO;
+import com.evecta.auth.model.UserEntity;
+import com.evecta.auth.model.UserRole;
+import com.evecta.auth.repository.IUserRepository;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @Slf4j
@@ -20,32 +23,27 @@ import java.util.stream.Collectors;
 public class UserService {
 
     private final IUserRepository userRepository;
+    private final AuthService authService;
     private final BCryptPasswordEncoder passwordEncoder;
 
     @Transactional
-    public UserResponseDTO createUser(UserCreateDTO userDTO) {
+    public UserEntity createOrReactivateUser(UserCreateDTO userDTO) {
         log.info("Creando usuario con RUT: {}", userDTO.getRut());
 
         // Validar RUT
         if (!RutValidator.validarRut(userDTO.getRut(), userDTO.getDv())) {
-            log.warn("RUT inválido: {}-{}", userDTO.getRut(), userDTO.getDv());
             throw new IllegalArgumentException("RUT inválido");
         }
 
-        // Buscar usuario existente por RUT
         UserEntity existingUser = userRepository.findByRut(userDTO.getRut()).orElse(null);
 
         if (existingUser != null) {
 
             if (existingUser.isActive()) {
-                log.warn("El usuario con RUT {} ya existe y está activo", userDTO.getRut());
                 throw new IllegalArgumentException("Usuario con este RUT ya existe");
             }
 
-            // Usuario existe pero está inactivo → reactivar
-            log.info("Usuario con RUT {} está inactivo. Se procederá a reactivarlo", userDTO.getRut());
-
-            // Validar email (porque es UNIQUE)
+            // Reactivar usuario
             if (!existingUser.getEmail().equals(userDTO.getEmail()) &&
                     userRepository.existsByEmail(userDTO.getEmail())) {
                 throw new IllegalArgumentException("Email ya registrado");
@@ -58,20 +56,18 @@ public class UserService {
             existingUser.setEmail(userDTO.getEmail());
             existingUser.setPassword(encodePassword(userDTO.getPassword()));
 
-            UserEntity updatedUser = userRepository.save(existingUser);
+            // SIEMPRE USER
+            existingUser.setRole(UserRole.USER_APP);
 
-            log.info("Usuario reactivado exitosamente con RUT: {}", updatedUser.getRut());
-
-            return UserResponseDTO.fromEntity(updatedUser);
+            return userRepository.save(existingUser);
         }
 
-        // Validar email para usuario nuevo
+        // Validar email
         if (userRepository.existsByEmail(userDTO.getEmail())) {
-            log.warn("El email {} ya está registrado", userDTO.getEmail());
             throw new IllegalArgumentException("Email ya se encuentra registrado");
         }
 
-        // Crear nuevo usuario
+        // Crear usuario
         UserEntity user = UserEntity.builder()
                 .rut(userDTO.getRut())
                 .dv(userDTO.getDv().toUpperCase())
@@ -80,14 +76,11 @@ public class UserService {
                 .birthDate(userDTO.getBirthDate())
                 .email(userDTO.getEmail())
                 .password(encodePassword(userDTO.getPassword()))
+                .role(UserRole.USER_APP)
                 .isActive(true)
                 .build();
 
-        UserEntity savedUser = userRepository.save(user);
-
-        log.info("Usuario creado exitosamente con RUT: {}", savedUser.getRut());
-
-        return UserResponseDTO.fromEntity(savedUser);
+        return userRepository.save(user);
     }
 
     @Transactional(readOnly = true)
@@ -130,6 +123,8 @@ public class UserService {
         if (!user.isActive()) {
             throw new IllegalStateException("El usuario ya está inactivo");
         }
+
+        authService.revokeAllUserTokens(user);
 
         user.deactivate();
         userRepository.save(user);

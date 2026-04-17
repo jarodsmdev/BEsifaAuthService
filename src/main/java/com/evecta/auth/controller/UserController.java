@@ -1,16 +1,28 @@
 package com.evecta.auth.controller;
 
-import com.evecta.auth.dto.UserCreateDTO;
-import com.evecta.auth.dto.UserResponseDTO;
+import java.util.List;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.evecta.auth.dto.auth.AuthResponseDTO;
+import com.evecta.auth.dto.user.UserCreateDTO;
+import com.evecta.auth.dto.user.UserResponseDTO;
+import com.evecta.auth.model.UserEntity;
+import com.evecta.auth.service.AuthService;
 import com.evecta.auth.service.UserService;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/auth/api/v1/users")
@@ -19,12 +31,18 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final AuthService authService;
 
-    @PostMapping()
+    @PostMapping
     public ResponseEntity<UserResponseDTO> registerUser(@Valid @RequestBody UserCreateDTO userDTO) {
-        log.info("Recibida solicitud de registro para RUT: {}", userDTO.getRut());
-        UserResponseDTO createdUser = userService.createUser(userDTO);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdUser);
+
+        log.info("Registro usuario RUT: {}", userDTO.getRut());
+
+        UserEntity user = userService.createOrReactivateUser(userDTO);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(UserResponseDTO.fromEntity(user));
     }
 
     /**

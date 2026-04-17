@@ -2,16 +2,14 @@ package com.evecta.auth.model;
 
 import com.evecta.auth.dto.RutValidator;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "users")
@@ -20,6 +18,9 @@ import java.time.LocalDateTime;
 public class UserEntity {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private UUID userId;
+
     @NotBlank
     @Column(unique = true, nullable = false)
     private String rut;
@@ -48,6 +49,11 @@ public class UserEntity {
     @NotBlank
     @Size(min = 8, message = "La contraseña debe tener al menos 8 caracteres")
     private String password;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private UserRole role;
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;

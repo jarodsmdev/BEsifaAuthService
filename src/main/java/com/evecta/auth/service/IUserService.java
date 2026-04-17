@@ -1,6 +1,6 @@
 package com.evecta.auth.service;
 
-import com.evecta.auth.dto.UserCreateDTO;
+import com.evecta.auth.dto.user.UserCreateDTO;
 import com.evecta.auth.model.UserEntity;
 
 public interface IUserService {

@@ -114,3 +114,11 @@ Los logs se generan en:
 - Error de conexión a MySQL: revisa `DB_HOST`, `DB_PORT`, `DB_USER` y `DB_PASSWORD`.
 - Puerto ocupado: cambia `SERVER_PORT`.
 - Error de credenciales: valida usuario/contraseña y permisos en MySQL.
+
+## Creación de usuario mysql
+
+```sql
+CREATE USER 'app_user'@'%' IDENTIFIED BY '<tu_password_segura>';
+GRANT ALL PRIVILEGES ON <tu_base_de_datos>.* TO 'app_user'@'%';
+FLUSH PRIVILEGES;
+```

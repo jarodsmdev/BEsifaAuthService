@@ -1,4 +1,4 @@
-package com.evecta.auth.dto;
+package com.evecta.auth.dto.user;
 
 import com.evecta.auth.model.UserEntity;
 import lombok.Data;
@@ -20,6 +20,7 @@ public class UserResponseDTO {
     private String lastName;
     private LocalDate birthDate;
     private String email;
+    private String role;
     private boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime modifiedAt;
@@ -33,6 +34,7 @@ public class UserResponseDTO {
                 .lastName(user.getLastName())
                 .birthDate(user.getBirthDate())
                 .email(user.getEmail())
+                .role(user.getRole().name())
                 .isActive(user.isActive())
                 .createdAt(user.getCreatedAt())
                 .modifiedAt(user.getModifiedAt())

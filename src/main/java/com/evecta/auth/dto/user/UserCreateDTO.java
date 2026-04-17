@@ -1,5 +1,7 @@
-package com.evecta.auth.dto;
+package com.evecta.auth.dto.user;
 
+import com.evecta.auth.dto.RutValidator;
+import com.evecta.auth.model.UserRole;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
@@ -30,6 +32,9 @@ public class UserCreateDTO {
     @NotBlank(message = "Email es obligatorio")
     @Email(message = "Email debe ser válido")
     private String email;
+
+    //@NotNull(message = "El rol es obligatorio")
+    //private UserRole role;
 
     @NotBlank(message = "Contraseña es obligatoria")
     @Size(min = 8, message = "Contraseña debe tener al menos 8 caracteres")
