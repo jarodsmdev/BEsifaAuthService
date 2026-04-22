@@ -4,16 +4,8 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import com.evecta.auth.dto.auth.AuthResponseDTO;
 import com.evecta.auth.dto.user.UserCreateDTO;
 import com.evecta.auth.dto.user.UserResponseDTO;
 import com.evecta.auth.model.UserEntity;
@@ -71,10 +63,21 @@ public class UserController {
         return ResponseEntity.ok(users);
     }
 
-    @DeleteMapping("/{rut}")
-    public ResponseEntity<Void> deactivateUser(@PathVariable String rut) {
-        log.info("Recibida solicitud para desactivar usuario: {}", rut);
-        userService.deactivateUser(rut);
+    @DeleteMapping
+    public ResponseEntity<Void> deactivateUser(
+            @RequestParam(required = false) String rut,
+            @RequestParam(required = false) String email) {
+
+        if (rut != null) {
+            log.info("Desactivar por RUT: {}", rut);
+            userService.deactivateUserByRut(rut);
+        } else if (email != null) {
+            log.info("Desactivar por email: {}", email);
+            userService.deactivateUserByEmail(email);
+        } else {
+            throw new IllegalArgumentException("Debe proporcionar rut o email");
+        }
+
         return ResponseEntity.noContent().build();
     }
 

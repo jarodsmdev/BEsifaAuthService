@@ -114,7 +114,7 @@ public class UserService {
     }
 
     @Transactional
-    public void deactivateUser(String rut) {
+    public void deactivateUserByRut(String rut) {
         log.info("Desactivando usuario con RUT: {}", rut);
 
         UserEntity user = userRepository.findByRut(rut)
@@ -161,5 +161,22 @@ public class UserService {
 
     private String encodePassword(String rawPassword) {
         return passwordEncoder.encode(rawPassword);
+    }
+
+    public void deactivateUserByEmail(String email) {
+        log.info("Desactivando usuario con email: {}", email);
+
+        UserEntity user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+        if (!user.isActive()) {
+            throw new IllegalStateException("El usuario ya está inactivo");
+        }
+
+        authService.revokeAllUserTokens(user);
+
+        user.deactivate();
+        userRepository.save(user);
+        log.info("Usuario desactivado exitosamente: {}", email);
     }
 }

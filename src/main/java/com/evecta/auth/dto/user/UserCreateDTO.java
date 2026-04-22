@@ -31,6 +31,12 @@ public class UserCreateDTO {
 
     @NotBlank(message = "Email es obligatorio")
     @Email(message = "Email debe ser válido")
+    @Pattern(
+            regexp = "^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@" +
+                    "(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\\.)+" +
+                    "[A-Za-z]{2,}$",
+            message = "Email debe ser válido y no contener caracteres especiales no permitidos"
+    )
     private String email;
 
     //@NotNull(message = "El rol es obligatorio")
