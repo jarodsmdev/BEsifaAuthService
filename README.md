@@ -23,15 +23,17 @@ Esta aplicación está asociada a **MySQL** y su configuración principal se rea
 
 Debes definir las siguientes variables antes de ejecutar la aplicación:
 
-| Variable | Requerida | Descripción | Ejemplo |
-|---|---|---|---|
-| `DB_HOST` | Sí | Host de MySQL | `localhost` |
-| `DB_PORT` | Sí | Puerto de MySQL | `3306` |
-| `DB_NAME` | Sí | Nombre de la base de datos | `auth_db` |
-| `DB_USER` | Sí | Usuario de MySQL | `root` |
-| `DB_PASSWORD` | Sí | Contraseña de MySQL | `root123` |
-| `BCRYPT_STRENGTH` | Sí | Fuerza de encriptación BCrypt (recomendado 10-12) | `10` |
-| `SERVER_PORT` | No | Puerto de la API (por defecto 8080) | `8080` |
+| Variable | Requerida | Descripción | Ejemplo           |
+|---|-----------|---|-------------------|
+| `DB_HOST` | Sí        | Host de MySQL | `localhost`       |
+| `DB_PORT` | Sí        | Puerto de MySQL | `3306`            |
+| `DB_NAME` | Sí        | Nombre de la base de datos | `auth_db`         |
+| `DB_USER` | Sí        | Usuario de MySQL | `root`            |
+| `DB_PASSWORD` | Sí        | Contraseña de MySQL | `root123`         |
+| `BCRYPT_STRENGTH` | Sí        | Fuerza de encriptación BCrypt (recomendado 10-12) | `10`              |
+| `SERVER_PORT` | No        | Puerto de la API (por defecto 8080) | `8080`            |
+| `ADMIN_EMAIL` | Sí        |  | `admin@email.com` |
+| `ADMIN_PASSWORD` | Sí        |  | `contraseña`      |
 
 ## Configuración de base de datos
 

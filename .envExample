@@ -10,9 +10,17 @@ DB_USER=usuario_de_tu_base_de_datos
 DB_PASSWORD=password_de_tu_base_de_datos
 
 # ============================================
+# USER ADMIN CONFIG
+# ============================================
+ADMIN_EMAIL=correo@admin.com
+ADMIN_PASSWORD=password_admin
+
+# ============================================
 # APP
 # ============================================
 SERVER_PORT=8081
+
+
 
 # ============================================
 # SECURITY
