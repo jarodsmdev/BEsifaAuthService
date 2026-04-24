@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # Servicio de MySQL
+  mysql:
+    image: mysql:8.0
+    container_name: auth_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password_segura
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - sifa-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password_segura"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Servicio de la API Auth
+  auth-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: auth-api
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      # Database
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+      # Admin
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+
+      # App
+      SERVER_PORT: 8080
+
+      # Security
+      BCRYPT_STRENGTH: 10
+
+      # JWT
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_SECONDS: 3600
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - sifa-network
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8080/auth/api/v1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s  # ← Aumentar tiempo de inicio
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  sifa-network:
+    external: true  # ← Indicar que es externa
