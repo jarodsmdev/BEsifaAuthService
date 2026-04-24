@@ -57,9 +57,9 @@ public class UserController {
     }
 
     @GetMapping()
-    public ResponseEntity<List<UserResponseDTO>> getAllActiveUsers() {
-        log.info("Recibida solicitud para listar todos los usuarios activos");
-        List<UserResponseDTO> users = userService.findAllActiveUsers();
+    public ResponseEntity<List<UserResponseDTO>> getAllUsers() {
+        log.info("Recibida solicitud para listar todos los usuarios");
+        List<UserResponseDTO> users = userService.findAllUsers();
         return ResponseEntity.ok(users);
     }
 
@@ -78,6 +78,13 @@ public class UserController {
             throw new IllegalArgumentException("Debe proporcionar rut o email");
         }
 
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{rut}/activate")
+    public ResponseEntity<Void> activateUser(@PathVariable String rut) {
+        log.info("Activando por RUT: {}", rut);
+        userService.activateUserByRut(rut);
         return ResponseEntity.noContent().build();
     }
 

@@ -12,7 +12,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-
 @Configuration
 @RequiredArgsConstructor
 public class DataInitializer {
@@ -23,13 +22,13 @@ public class DataInitializer {
     @Value("${app.admin.email}")
     private String adminEmail;
 
-    @Value("${app.admin.password")
+    @Value("${app.admin.password}")
     private String adminPassword;
 
     @Bean
     CommandLineRunner initAdminUser() {
         return args -> {
-            if (userRepository.findByEmail(adminEmail).isPresent()){
+            if (userRepository.findByEmail(adminEmail).isPresent()) {
                 log.info("[!] Usuario admin ya existe");
                 return;
             }

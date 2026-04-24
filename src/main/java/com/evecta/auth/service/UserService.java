@@ -104,6 +104,16 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
+    public List<UserResponseDTO> findAllUsers() {
+        log.info("Listando todos los usuarios (activos e inactivos)");
+
+        return userRepository.findAll()
+                .stream()
+                .map(UserResponseDTO::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<UserResponseDTO> findAllActiveUsers() {
         log.info("Listando todos los usuarios activos");
 
@@ -129,6 +139,22 @@ public class UserService {
         user.deactivate();
         userRepository.save(user);
         log.info("Usuario desactivado exitosamente: {}", rut);
+    }
+
+    @Transactional
+    public void activateUserByRut(String rut) {
+        log.info("Activando usuario con RUT: {}", rut);
+
+        UserEntity user = userRepository.findByRut(rut)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+        if (user.isActive()) {
+            throw new IllegalStateException("El usuario ya está activo");
+        }
+
+        user.activate();
+        userRepository.save(user);
+        log.info("Usuario activado exitosamente: {}", rut);
     }
 
     @Transactional
