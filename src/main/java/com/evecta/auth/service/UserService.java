@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.evecta.auth.dto.RutValidator;
 import com.evecta.auth.dto.user.UserCreateDTO;
+import com.evecta.auth.dto.user.UserUpdateDTO;
 import com.evecta.auth.dto.user.UserResponseDTO;
 import com.evecta.auth.model.UserEntity;
 import com.evecta.auth.model.UserRole;
@@ -54,10 +55,11 @@ public class UserService {
             existingUser.setLastName(userDTO.getLastName());
             existingUser.setBirthDate(userDTO.getBirthDate());
             existingUser.setEmail(userDTO.getEmail());
+            existingUser.setPhone(userDTO.getPhone());
             existingUser.setPassword(encodePassword(userDTO.getPassword()));
 
-            // SIEMPRE USER
-            existingUser.setRole(UserRole.USER_APP);
+            // Mantenemos el rol que ya tenía si es una reactivación
+            // existingUser.setRole(existingUser.getRole()); // No hace falta cambiarlo
 
             return userRepository.save(existingUser);
         }
@@ -70,11 +72,12 @@ public class UserService {
         // Crear usuario
         UserEntity user = UserEntity.builder()
                 .rut(userDTO.getRut())
-                .dv(userDTO.getDv().toUpperCase())
+                .dv(userDTO.getDv())
                 .name(userDTO.getName())
                 .lastName(userDTO.getLastName())
                 .birthDate(userDTO.getBirthDate())
                 .email(userDTO.getEmail())
+                .phone(userDTO.getPhone())
                 .password(encodePassword(userDTO.getPassword()))
                 .role(UserRole.USER_APP)
                 .isActive(true)
@@ -124,69 +127,85 @@ public class UserService {
     }
 
     @Transactional
-    public void deactivateUserByRut(String rut, String requestingUserEmail) {
+    public UserResponseDTO deactivateUserByRut(String rut, String requestingUserEmail) {
         log.info("Desactivando usuario con RUT: {}", rut);
 
         UserEntity user = userRepository.findByRut(rut)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con RUT: " + rut));
 
-        if (!user.isActive()) {
-            throw new IllegalStateException("El usuario ya está inactivo");
+        if (user.getEmail().equals(requestingUserEmail)) {
+            throw new IllegalStateException("No puedes desactivar tu propia cuenta");
         }
 
-        // Regla de negocio: un usuario no puede revocar su propia cuenta
-        if (user.getEmail().equals(requestingUserEmail)) {
-            throw new IllegalArgumentException("No puedes revocar tu propia cuenta");
+        if (!user.isActive()) {
+            throw new IllegalStateException("El usuario ya está desactivado");
         }
 
         authService.revokeAllUserTokens(user);
 
         user.deactivate();
-        userRepository.save(user);
+        UserEntity updatedUser = userRepository.save(user);
         log.info("Usuario desactivado exitosamente: {}", rut);
+        return UserResponseDTO.fromEntity(updatedUser);
     }
 
     @Transactional
-    public void activateUserByRut(String rut) {
+    public UserResponseDTO activateUserByRut(String rut) {
         log.info("Activando usuario con RUT: {}", rut);
 
         UserEntity user = userRepository.findByRut(rut)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con RUT: " + rut));
 
         if (user.isActive()) {
             throw new IllegalStateException("El usuario ya está activo");
         }
 
         user.activate();
-        userRepository.save(user);
+        UserEntity updatedUser = userRepository.save(user);
         log.info("Usuario activado exitosamente: {}", rut);
+        return UserResponseDTO.fromEntity(updatedUser);
     }
 
     @Transactional
-    public UserResponseDTO updateUser(String rut, UserCreateDTO userDTO) {
+    public UserResponseDTO updateUser(String rut, UserUpdateDTO userDTO) {
         log.info("Actualizando usuario con RUT: {}", rut);
 
-        // Buscar usuario sólo si está activo, para evitar actualizar usuarios inactivos
         UserEntity user = userRepository.findActiveByRut(rut)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado o inactivo"));
 
         // Actualizar campos permitidos
         if (userDTO.getName() != null) user.setName(userDTO.getName());
         if (userDTO.getLastName() != null) user.setLastName(userDTO.getLastName());
-        if (userDTO.getBirthDate() != null) user.setBirthDate(userDTO.getBirthDate());
         if (userDTO.getEmail() != null && !userDTO.getEmail().equals(user.getEmail())) {
             if (userRepository.existsByEmail(userDTO.getEmail())) {
                 throw new IllegalArgumentException("Email ya registrado");
             }
             user.setEmail(userDTO.getEmail());
         }
+        if (userDTO.getPhone() != null) user.setPhone(userDTO.getPhone());
+        
         if (userDTO.getPassword() != null && !userDTO.getPassword().isEmpty()) {
             user.setPassword(encodePassword(userDTO.getPassword()));
         }
 
         UserEntity updatedUser = userRepository.save(user);
-        log.info("Usuario actualizado exitosamente: {}", rut);
+        return UserResponseDTO.fromEntity(updatedUser);
+    }
 
+    @Transactional
+    public UserResponseDTO updateUserRole(String rut, String roleName) {
+        log.info("Actualizando ROL para RUT: {} a {}", rut, roleName);
+        UserEntity user = userRepository.findActiveByRut(rut)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado o inactivo"));
+
+        try {
+            UserRole role = UserRole.valueOf(roleName.toUpperCase());
+            user.setRole(role);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Rol no válido: " + roleName);
+        }
+
+        UserEntity updatedUser = userRepository.save(user);
         return UserResponseDTO.fromEntity(updatedUser);
     }
 
@@ -194,25 +213,26 @@ public class UserService {
         return passwordEncoder.encode(rawPassword);
     }
 
-    public void deactivateUserByEmail(String email, String requestingUserEmail) {
+    @Transactional
+    public UserResponseDTO deactivateUserByEmail(String email, String requestingUserEmail) {
         log.info("Desactivando usuario con email: {}", email);
 
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con email: " + email));
+
+        if (user.getEmail().equals(requestingUserEmail)) {
+            throw new IllegalStateException("No puedes desactivar tu propia cuenta");
+        }
 
         if (!user.isActive()) {
             throw new IllegalStateException("El usuario ya está inactivo");
         }
 
-        // Regla de negocio: un usuario no puede revocar su propia cuenta
-        if (user.getEmail().equals(requestingUserEmail)) {
-            throw new IllegalArgumentException("No puedes revocar tu propia cuenta");
-        }
-
         authService.revokeAllUserTokens(user);
 
         user.deactivate();
-        userRepository.save(user);
+        UserEntity updatedUser = userRepository.save(user);
         log.info("Usuario desactivado exitosamente: {}", email);
+        return UserResponseDTO.fromEntity(updatedUser);
     }
 }
