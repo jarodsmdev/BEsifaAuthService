@@ -1,6 +1,7 @@
 package com.evecta.auth.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -8,6 +9,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import com.evecta.auth.dto.user.UserCreateDTO;
+import com.evecta.auth.dto.user.UserUpdateDTO;
 import com.evecta.auth.dto.user.UserResponseDTO;
 import com.evecta.auth.model.UserEntity;
 import com.evecta.auth.service.AuthService;
@@ -65,37 +67,41 @@ public class UserController {
     }
 
     @DeleteMapping
-    public ResponseEntity<Void> deactivateUser(
+    public ResponseEntity<UserResponseDTO> deactivateUser(
             Authentication authentication,
             @RequestParam(required = false) String rut,
             @RequestParam(required = false) String email) {
-
         String requestingUserEmail = authentication.getName();
 
         if (rut != null) {
             log.info("Desactivar por RUT: {}", rut);
-            userService.deactivateUserByRut(rut, requestingUserEmail);
+            return ResponseEntity.ok(userService.deactivateUserByRut(rut, requestingUserEmail));
         } else if (email != null) {
             log.info("Desactivar por email: {}", email);
-            userService.deactivateUserByEmail(email, requestingUserEmail);
+            return ResponseEntity.ok(userService.deactivateUserByEmail(email, requestingUserEmail));
         } else {
             throw new IllegalArgumentException("Debe proporcionar rut o email");
         }
-
-        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{rut}/activate")
-    public ResponseEntity<Void> activateUser(@PathVariable String rut) {
+    public ResponseEntity<UserResponseDTO> activateUser(@PathVariable String rut) {
         log.info("Activando por RUT: {}", rut);
-        userService.activateUserByRut(rut);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(userService.activateUserByRut(rut));
+    }
+
+    @PatchMapping("/{rut}/role")
+    public ResponseEntity<UserResponseDTO> updateUserRole(
+            @PathVariable String rut,
+            @RequestBody Map<String, String> body) {
+        String roleName = body.get("role");
+        return ResponseEntity.ok(userService.updateUserRole(rut, roleName));
     }
 
     @PutMapping("/{rut}")
     public ResponseEntity<UserResponseDTO> updateUser(
             @PathVariable String rut,
-            @Valid @RequestBody UserCreateDTO userDTO) {
+            @Valid @RequestBody UserUpdateDTO userDTO) {
         log.info("Recibida solicitud de actualización para RUT: {}", rut);
         UserResponseDTO updatedUser = userService.updateUser(rut, userDTO);
         return ResponseEntity.ok(updatedUser);
