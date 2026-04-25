@@ -20,6 +20,7 @@ public class UserResponseDTO {
     private String lastName;
     private LocalDate birthDate;
     private String email;
+    private String phone;
     private String role;
     private boolean isActive;
     private LocalDateTime createdAt;
@@ -34,6 +35,7 @@ public class UserResponseDTO {
                 .lastName(user.getLastName())
                 .birthDate(user.getBirthDate())
                 .email(user.getEmail())
+                .phone(user.getPhone())
                 .role(user.getRole().name())
                 .isActive(user.isActive())
                 .createdAt(user.getCreatedAt())

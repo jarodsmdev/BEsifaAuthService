@@ -46,6 +46,10 @@ public class UserEntity {
     @Column(unique = true, nullable = false)
     private String email;
 
+    @Size(max = 20, message = "El teléfono no puede exceder los 20 caracteres")
+    @Column(length = 20)
+    private String phone;
+
     @NotBlank
     @Size(min = 8, message = "La contraseña debe tener al menos 8 caracteres")
     private String password;
