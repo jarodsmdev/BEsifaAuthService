@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import com.evecta.auth.dto.user.UserCreateDTO;
@@ -65,15 +66,18 @@ public class UserController {
 
     @DeleteMapping
     public ResponseEntity<Void> deactivateUser(
+            Authentication authentication,
             @RequestParam(required = false) String rut,
             @RequestParam(required = false) String email) {
 
+        String requestingUserEmail = authentication.getName();
+
         if (rut != null) {
             log.info("Desactivar por RUT: {}", rut);
-            userService.deactivateUserByRut(rut);
+            userService.deactivateUserByRut(rut, requestingUserEmail);
         } else if (email != null) {
             log.info("Desactivar por email: {}", email);
-            userService.deactivateUserByEmail(email);
+            userService.deactivateUserByEmail(email, requestingUserEmail);
         } else {
             throw new IllegalArgumentException("Debe proporcionar rut o email");
         }

@@ -124,7 +124,7 @@ public class UserService {
     }
 
     @Transactional
-    public void deactivateUserByRut(String rut) {
+    public void deactivateUserByRut(String rut, String requestingUserEmail) {
         log.info("Desactivando usuario con RUT: {}", rut);
 
         UserEntity user = userRepository.findByRut(rut)
@@ -132,6 +132,11 @@ public class UserService {
 
         if (!user.isActive()) {
             throw new IllegalStateException("El usuario ya está inactivo");
+        }
+
+        // Regla de negocio: un usuario no puede revocar su propia cuenta
+        if (user.getEmail().equals(requestingUserEmail)) {
+            throw new IllegalArgumentException("No puedes revocar tu propia cuenta");
         }
 
         authService.revokeAllUserTokens(user);
@@ -189,7 +194,7 @@ public class UserService {
         return passwordEncoder.encode(rawPassword);
     }
 
-    public void deactivateUserByEmail(String email) {
+    public void deactivateUserByEmail(String email, String requestingUserEmail) {
         log.info("Desactivando usuario con email: {}", email);
 
         UserEntity user = userRepository.findByEmail(email)
@@ -197,6 +202,11 @@ public class UserService {
 
         if (!user.isActive()) {
             throw new IllegalStateException("El usuario ya está inactivo");
+        }
+
+        // Regla de negocio: un usuario no puede revocar su propia cuenta
+        if (user.getEmail().equals(requestingUserEmail)) {
+            throw new IllegalArgumentException("No puedes revocar tu propia cuenta");
         }
 
         authService.revokeAllUserTokens(user);

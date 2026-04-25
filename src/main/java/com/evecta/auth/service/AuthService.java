@@ -108,10 +108,6 @@ public class AuthService {
 
         roles.add("ROLE_USER");
 
-        if (role == UserRole.USER_ADMIN ) {
-            roles.add("ROLE_ADMIN");
-        }
-
         if (role == UserRole.USER_ADMIN) {
             roles.add("ROLE_ADMIN");
         }

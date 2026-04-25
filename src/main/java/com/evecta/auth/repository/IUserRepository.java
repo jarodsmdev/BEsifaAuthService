@@ -7,28 +7,36 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
-public interface IUserRepository extends JpaRepository<UserEntity, String> {
+public interface IUserRepository extends JpaRepository<UserEntity, UUID> {
 
     /**
-     * Devuelve un Optional de UserEntity basado en el RUT, solo si el usuario está activo.
+     * Devuelve un Optional de UserEntity basado en el RUT, solo si el usuario está
+     * activo.
+     * 
      * @param rut El RUT del usuario a buscar.
-     * @return Optional de UserEntity si se encuentra un usuario activo con el RUT dado, de lo contrario un Optional vacío.
+     * @return Optional de UserEntity si se encuentra un usuario activo con el RUT
+     *         dado, de lo contrario un Optional vacío.
      */
     @Query("SELECT u FROM UserEntity u WHERE u.rut =:rut AND u.isActive = true")
     Optional<UserEntity> findActiveByRut(String rut);
 
     /**
-     * Devuelve un Optional de UserEntity basado en el RUT, sin importar si el usuario está activo o no.
+     * Devuelve un Optional de UserEntity basado en el RUT, sin importar si el
+     * usuario está activo o no.
+     * 
      * @param rut El RUT del usuario a buscar.
-     * @return Optional de UserEntity si se encuentra un usuario con el RUT dado, de lo contrario un Optional vacío.
+     * @return Optional de UserEntity si se encuentra un usuario con el RUT dado, de
+     *         lo contrario un Optional vacío.
      */
     Optional<UserEntity> findByRut(String rut);
 
     /**
      * Devuelve un Optional de UserEntity sólo si el usuario se encuentra activo.
-     * @return 
+     * 
+     * @return
      */
     List<UserEntity> findAllByIsActiveTrue();
 
@@ -38,5 +46,6 @@ public interface IUserRepository extends JpaRepository<UserEntity, String> {
 
     Optional<UserEntity> findByEmail(String email);
 
+    @Query("SELECT u FROM UserEntity u WHERE u.email = :email AND u.isActive = true")
     Optional<UserEntity> findActiveByEmail(String email);
 }
