@@ -32,7 +32,12 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/auth/api/v1/login").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/auth/api/v1/users").permitAll() // Para registrar usuario
+                        // Solo los ADMIN pueden crear, borrar o cambiar roles
+                        .requestMatchers(HttpMethod.POST, "/auth/api/v1/users").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/auth/api/v1/users").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/auth/api/v1/users/*/role").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/auth/api/v1/users/*/activate").hasAuthority("ADMIN")
+                        // Cualquier usuario autenticado puede ver la lista
                         .anyRequest().authenticated())
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
