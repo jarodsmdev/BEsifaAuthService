@@ -60,6 +60,7 @@ public class UserEntity {
     private UserRole role;
 
     @Column(name = "is_active", nullable = false)
+    @Builder.Default
     private boolean isActive = true;
 
     @CreationTimestamp

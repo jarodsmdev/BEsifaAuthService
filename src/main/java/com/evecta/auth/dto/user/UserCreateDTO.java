@@ -1,6 +1,7 @@
 package com.evecta.auth.dto.user;
 
 import com.evecta.auth.dto.RutValidator;
+import com.evecta.auth.model.UserRole;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
@@ -41,8 +42,8 @@ public class UserCreateDTO {
         @Size(max = 20, message = "El teléfono no puede exceder los 20 caracteres")
         private String phone;
 
-        // @NotNull(message = "El rol es obligatorio")
-        // private UserRole role;
+        @NotNull(message = "El rol es obligatorio")
+        private UserRole role;
 
         @NotBlank(message = "Contraseña es obligatoria")
         @Size(min = 8, message = "Contraseña debe tener al menos 8 caracteres")

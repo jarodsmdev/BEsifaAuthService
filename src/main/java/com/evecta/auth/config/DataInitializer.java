@@ -26,6 +26,7 @@ public class DataInitializer {
     private String adminPassword;
 
     @Bean
+    @SuppressWarnings("null")
     CommandLineRunner initAdminUser() {
         return args -> {
             if (userRepository.findByEmail(adminEmail).isPresent()) {

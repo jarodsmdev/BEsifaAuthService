@@ -28,6 +28,7 @@ public class UserService {
     private final BCryptPasswordEncoder passwordEncoder;
 
     @Transactional
+    @SuppressWarnings("null")
     public UserEntity createOrReactivateUser(UserCreateDTO userDTO) {
         log.info("Creando usuario con RUT: {}", userDTO.getRut());
 
@@ -79,7 +80,7 @@ public class UserService {
                 .email(userDTO.getEmail())
                 .phone(userDTO.getPhone())
                 .password(encodePassword(userDTO.getPassword()))
-                .role(UserRole.USER_APP)
+                .role(userDTO.getRole())
                 .isActive(true)
                 .build();
 
@@ -167,6 +168,7 @@ public class UserService {
     }
 
     @Transactional
+    @SuppressWarnings("null")
     public UserResponseDTO updateUser(String rut, UserUpdateDTO userDTO) {
         log.info("Actualizando usuario con RUT: {}", rut);
 

@@ -12,7 +12,6 @@ import com.evecta.auth.dto.user.UserCreateDTO;
 import com.evecta.auth.dto.user.UserUpdateDTO;
 import com.evecta.auth.dto.user.UserResponseDTO;
 import com.evecta.auth.model.UserEntity;
-import com.evecta.auth.service.AuthService;
 import com.evecta.auth.service.UserService;
 
 import jakarta.validation.Valid;
@@ -26,7 +25,6 @@ import lombok.extern.slf4j.Slf4j;
 public class UserController {
 
     private final UserService userService;
-    private final AuthService authService;
 
     @PostMapping
     public ResponseEntity<UserResponseDTO> registerUser(@Valid @RequestBody UserCreateDTO userDTO) {
@@ -41,9 +39,12 @@ public class UserController {
     }
 
     /**
-     * Endpoint para buscar un usuario por su RUT. Devuelve un DTO con los datos del usuario.
+     * Endpoint para buscar un usuario por su RUT. Devuelve un DTO con los datos del
+     * usuario.
+     * 
      * @param rut RUT del usuario a buscar (Ej: 12345678)
-     * @return ResponseEntity con el DTO del usuario encontrado o un error si no se encuentra.
+     * @return ResponseEntity con el DTO del usuario encontrado o un error si no se
+     *         encuentra.
      */
     @GetMapping("/{rut}")
     public ResponseEntity<UserResponseDTO> getUserByRut(@PathVariable String rut) {

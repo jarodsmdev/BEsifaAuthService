@@ -32,11 +32,16 @@ public class AuthService {
     @Transactional
     public AuthResponseDTO login(LoginRequestDTO loginRequest) {
 
-        UserEntity user = userRepository.findActiveByEmail(loginRequest.getEmail())
-                .orElseThrow(() -> new BadCredentialsException("Credenciales inválidas"));
+        UserEntity user = userRepository.findByEmail(loginRequest.getEmail())
+                .orElseThrow(() -> new BadCredentialsException("Correo o contraseña incorrectos"));
+
+        if (!user.isActive()) {
+            log.warn("Intento de login para cuenta revocada: {}", user.getEmail());
+            throw new BadCredentialsException("Esta cuenta ha sido revocada. Contacte al administrador.");
+        }
 
         if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
-            throw new BadCredentialsException("Credenciales inválidas");
+            throw new BadCredentialsException("Correo o contraseña incorrectos");
         }
 
         AuthResponseDTO response = issueTokenForUser(user);
@@ -57,6 +62,7 @@ public class AuthService {
         return response;
     }
 
+    @SuppressWarnings("null")
     private void saveUserToken(UserEntity user, String jwtToken) {
         Token token = Token.builder()
                 .user(user)
