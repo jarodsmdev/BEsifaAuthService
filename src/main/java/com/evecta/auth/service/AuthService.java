@@ -103,17 +103,25 @@ public class AuthService {
         log.info("Token revocado correctamente");
     }
 
-    private List<String> resolveRoles(UserRole role) {
+    private List<String> resolveRoles(UserEntity user) {
         List<String> roles = new ArrayList<>();
 
-        roles.add("ROLE_USER");
+        if (user.getRole() == UserRole.USER_APP){
+            roles.add("USER_APP");
+        }
 
-        if (role == UserRole.USER_ADMIN) {
-            roles.add("ROLE_ADMIN");
-        } else if (role == UserRole.USER_SUPERVISOR) {
-            roles.add("ROLE_SUPERVISOR");
-        } else if (role == UserRole.USER_JPL) {
-            roles.add("ROLE_JPL");
+
+        if (user.getRole() == UserRole.USER_JPL){
+            roles.add("USER_JPL");
+        }
+
+        if (user.getRole() == UserRole.USER_SUPERVISOR){
+            roles.add("USER_SUPERVISOR");
+        }
+
+        if (user.getRole() == UserRole.USER_ADMIN){
+            roles.add("USER_ADMIN");
+
         }
 
         return roles;
@@ -121,7 +129,7 @@ public class AuthService {
 
     private AuthResponseDTO buildAuthResponse(UserEntity user) {
 
-        List<String> roles = resolveRoles(user.getRole());
+        List<String> roles = resolveRoles(user);
 
         JwtService.AuthTokenData tokenData =
                 jwtService.generateToken(user, roles, List.of());

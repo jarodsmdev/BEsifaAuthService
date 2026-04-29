@@ -33,10 +33,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/auth/api/v1/login").permitAll()
                         // Solo los ADMIN pueden crear, borrar o cambiar roles
-                        .requestMatchers(HttpMethod.POST, "/auth/api/v1/users").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/auth/api/v1/users").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PATCH, "/auth/api/v1/users/*/role").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PATCH, "/auth/api/v1/users/*/activate").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/auth/api/v1/users").hasAuthority("USER_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/auth/api/v1/users").hasAuthority("USER_ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/auth/api/v1/users/*/role").hasAuthority("USER_ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/auth/api/v1/users/*/activate").hasAuthority("USER_ADMIN")
                         // Cualquier usuario autenticado puede ver la lista
                         .anyRequest().authenticated())
                 .httpBasic(AbstractHttpConfigurer::disable)
