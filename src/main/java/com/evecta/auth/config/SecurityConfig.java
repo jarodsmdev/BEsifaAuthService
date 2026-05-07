@@ -29,7 +29,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .cors(Customizer.withDefaults())
+                //.cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
@@ -47,23 +47,23 @@ public class SecurityConfig {
         return http.build();
     }
 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        // Allow Vite frontend
-        configuration.setAllowedOrigins(Arrays.asList(
-                "https://sifacore.netlify.app",
-                "http://localhost:5173",
-                "http://localhost:3000"));
-        configuration.setAllowCredentials(true); // Permitir cookies (si es necesario)
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        // configuration.setAllowedHeaders(Arrays.asList("Authorization",
-        // "Content-Type"));
-        configuration.setAllowedHeaders(Arrays.asList("*")); // Permitir todos los headers (incluyendo Authorization)
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
-    }
+    // @Bean
+    // public CorsConfigurationSource corsConfigurationSource() {
+    //     CorsConfiguration configuration = new CorsConfiguration();
+    //     // Allow Vite frontend
+    //     configuration.setAllowedOrigins(Arrays.asList(
+    //             "https://sifacore.netlify.app",
+    //             "http://localhost:5173",
+    //             "http://localhost:3000"));
+    //     //configuration.setAllowCredentials(true); // Permitir cookies (si es necesario)
+    //     configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+    //     // configuration.setAllowedHeaders(Arrays.asList("Authorization",
+    //     // "Content-Type"));
+    //     configuration.setAllowedHeaders(Arrays.asList("*")); // Permitir todos los headers (incluyendo Authorization)
+    //     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    //     source.registerCorsConfiguration("/**", configuration);
+    //     return source;
+    // }
 
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
