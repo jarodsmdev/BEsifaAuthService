@@ -67,6 +67,13 @@ public class UserController {
         return ResponseEntity.ok(users);
     }
 
+    @GetMapping("/fiscalizadores")
+    public ResponseEntity<List<UserResponseDTO>> getAllFiscalizadores() {
+        log.info("Recibida solicitud para listar todos los usuarios fiscalizadores");
+        List<UserResponseDTO> users = userService.findAllFiscalizadores();
+        return ResponseEntity.ok(users);
+    }
+
     @DeleteMapping
     public ResponseEntity<UserResponseDTO> deactivateUser(
             Authentication authentication,
