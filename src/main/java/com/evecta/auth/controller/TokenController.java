@@ -2,6 +2,10 @@ package com.evecta.auth.controller;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -24,9 +28,11 @@ public class TokenController {
     private final TokenService tokenService;
 
     @GetMapping
-    public ResponseEntity<List<TokenResponseDTO>> getAllTokens() {
-        log.info("Recibida solicitud para listar todos los tokens");
-        return ResponseEntity.ok(tokenService.findAllTokens());
+    public ResponseEntity<Page<TokenResponseDTO>> getAllTokens(
+            @PageableDefault(size = 20, sort = "idToken", direction = Sort.Direction.DESC) Pageable pageable) {
+        log.info("Recibida solicitud para listar tokens - página: {}, tamaño: {}",
+                pageable.getPageNumber(), pageable.getPageSize());
+        return ResponseEntity.ok(tokenService.findAllTokens(pageable));
     }
 
     @GetMapping("/{id}")

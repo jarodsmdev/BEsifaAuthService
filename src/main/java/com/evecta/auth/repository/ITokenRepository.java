@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface ITokenRepository extends JpaRepository<Token, Long> {
 
@@ -14,5 +16,5 @@ public interface ITokenRepository extends JpaRepository<Token, Long> {
 
     List<Token> findAllByUser_Rut(String rut);
 
-    List<Token> findAllByOrderByIdTokenDesc();
+    Page<Token> findAllByOrderByIdTokenDesc(Pageable pageable);
 }

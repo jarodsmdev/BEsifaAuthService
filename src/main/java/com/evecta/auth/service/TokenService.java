@@ -3,6 +3,8 @@ package com.evecta.auth.service;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,12 +24,10 @@ public class TokenService implements ITokenService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<TokenResponseDTO> findAllTokens() {
-        log.info("Listando todos los tokens");
-        return tokenRepository.findAllByOrderByIdTokenDesc()
-                .stream()
-                .map(TokenResponseDTO::fromEntity)
-                .collect(Collectors.toList());
+    public Page<TokenResponseDTO> findAllTokens(Pageable pageable) {
+        log.info("Listando tokens - página: {}, tamaño: {}", pageable.getPageNumber(), pageable.getPageSize());
+        return tokenRepository.findAllByOrderByIdTokenDesc(pageable)
+                .map(TokenResponseDTO::fromEntity);
     }
 
     @Override
