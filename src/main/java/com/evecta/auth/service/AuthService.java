@@ -81,7 +81,6 @@ public class AuthService {
 
         if (!validTokens.isEmpty()) {
             validTokens.forEach(token -> {
-                token.setExpired(true);
                 token.setRevoked(true);
             });
 

@@ -34,6 +34,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/api/v1/login").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/auth/api/v1/validate").permitAll()
                         // Solo los ADMIN pueden crear, borrar o cambiar roles
                         .requestMatchers(HttpMethod.POST, "/auth/api/v1/users").hasAuthority("USER_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/auth/api/v1/users").hasAuthority("USER_ADMIN")
