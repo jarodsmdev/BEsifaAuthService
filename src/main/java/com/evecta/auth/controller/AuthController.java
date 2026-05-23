@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.evecta.auth.dto.auth.AuthResponseDTO;
 import com.evecta.auth.dto.auth.LoginRequestDTO;
-import com.evecta.auth.model.Token;
 import com.evecta.auth.model.UserEntity;
 import com.evecta.auth.model.UserRole;
 import com.evecta.auth.repository.ITokenRepository;

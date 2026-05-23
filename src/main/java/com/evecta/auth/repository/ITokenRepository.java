@@ -11,4 +11,8 @@ public interface ITokenRepository extends JpaRepository<Token, Long> {
     Optional<Token> findByToken(String token);
 
     List<Token> findAllByUser_RutAndExpiredFalseAndRevokedFalse(String rut);
+
+    List<Token> findAllByUser_Rut(String rut);
+
+    List<Token> findAllByOrderByIdTokenDesc();
 }

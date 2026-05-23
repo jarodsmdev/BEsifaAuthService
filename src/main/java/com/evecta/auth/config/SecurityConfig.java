@@ -39,6 +39,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/auth/api/v1/users").hasAuthority("USER_ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/auth/api/v1/users/*/role").hasAuthority("USER_ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/auth/api/v1/users/*/activate").hasAuthority("USER_ADMIN")
+                        // Solo ADMIN pueden gestionar tokens
+                        .requestMatchers(HttpMethod.GET, "/auth/api/v1/tokens/**").hasAuthority("USER_ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/auth/api/v1/tokens/**").hasAuthority("USER_ADMIN")
                         // Cualquier usuario autenticado puede ver la lista
                         .anyRequest().authenticated())
                 .httpBasic(AbstractHttpConfigurer::disable)
