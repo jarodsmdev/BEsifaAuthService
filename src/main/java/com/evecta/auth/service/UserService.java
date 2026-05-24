@@ -118,6 +118,16 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
+    public List<UserResponseDTO> findAllFiscalizadores() {
+        log.info("Listando a todos los usuarios fiscalizadores");
+
+        return userRepository.findAllFiscalizadores()
+                .stream()
+                .map(UserResponseDTO::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<UserResponseDTO> findAllActiveUsers() {
         log.info("Listando todos los usuarios activos");
 
