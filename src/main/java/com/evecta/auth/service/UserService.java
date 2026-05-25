@@ -1,7 +1,9 @@
 package com.evecta.auth.service;
 
 import java.util.List;
-import java.util.stream.Collectors;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -108,13 +110,11 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public List<UserResponseDTO> findAllUsers() {
-        log.info("Listando todos los usuarios (activos e inactivos)");
+    public Page<UserResponseDTO> findAllUsers(Pageable pageable) {
+        log.info("Listando usuarios - página: {}, tamaño: {}", pageable.getPageNumber(), pageable.getPageSize());
 
-        return userRepository.findAll()
-                .stream()
-                .map(UserResponseDTO::fromEntity)
-                .collect(Collectors.toList());
+        return userRepository.findAll(pageable)
+                .map(UserResponseDTO::fromEntity);
     }
 
     @Transactional(readOnly = true)
@@ -124,7 +124,7 @@ public class UserService {
         return userRepository.findAllFiscalizadores()
                 .stream()
                 .map(UserResponseDTO::fromEntity)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -134,7 +134,7 @@ public class UserService {
         return userRepository.findAllByIsActiveTrue()
                 .stream()
                 .map(UserResponseDTO::fromEntity)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Transactional

@@ -3,6 +3,10 @@ package com.evecta.auth.controller;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -61,10 +65,11 @@ public class UserController {
     }
 
     @GetMapping()
-    public ResponseEntity<List<UserResponseDTO>> getAllUsers() {
-        log.info("Recibida solicitud para listar todos los usuarios");
-        List<UserResponseDTO> users = userService.findAllUsers();
-        return ResponseEntity.ok(users);
+    public ResponseEntity<Page<UserResponseDTO>> getAllUsers(
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        log.info("Recibida solicitud para listar usuarios - página: {}, tamaño: {}",
+                pageable.getPageNumber(), pageable.getPageSize());
+        return ResponseEntity.ok(userService.findAllUsers(pageable));
     }
 
     @GetMapping("/fiscalizadores")
