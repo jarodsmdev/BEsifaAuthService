@@ -23,9 +23,17 @@ public class TokenResponseDTO {
     private String userLastName;
 
     public static TokenResponseDTO fromEntity(Token token) {
+
+        String tokenValue = token.getToken();
+
+        // Esta linea enmascara el token dejando solo los primeros 5 caracteres visibles y el resto reemplazado por asteriscos
+        String maskedToken = tokenValue != null && tokenValue.length() > 5
+                ? tokenValue.substring(0, 5) + "***********"
+                : tokenValue;
+
         return TokenResponseDTO.builder()
                 .idToken(token.getIdToken())
-                .token(token.getToken())
+                .token(maskedToken)
                 .tokenType(token.getTokenType().name())
                 .revoked(token.isRevoked())
                 .expired(token.isExpired())
