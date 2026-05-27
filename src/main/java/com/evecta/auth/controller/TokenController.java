@@ -32,7 +32,7 @@ import lombok.extern.slf4j.Slf4j;
 @RestController
 @RequestMapping("/auth/api/v1/tokens")
 @Tag(
-    name = "3. Gestión de Tokens",
+    name = "Gestión de Tokens",
     description =
         "Endpoints para la administración y consulta de tokens JWT emitidos por el sistema")
 @SecurityRequirement(name = "bearerAuth")

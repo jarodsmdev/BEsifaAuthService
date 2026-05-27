@@ -34,7 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/auth/api/v1")
-@Tag(name = "1. Autenticación", description = "Endpoints perimetrales para la generación, validación y revocación de sesiones de usuarios")
+@Tag(name = "Autenticación", description = "Endpoints perimetrales para la generación, validación y revocación de sesiones de usuarios")
 @RequiredArgsConstructor
 @Slf4j
 public class AuthController {

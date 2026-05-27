@@ -36,7 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(
-    name = "2. Gestión de Usuarios",
+    name = "Gestión de Usuarios",
     description = "Endpoints para la administración de usuarios del sistema")
 @SecurityRequirement(name = "bearerAuth")
 public class UserController {
