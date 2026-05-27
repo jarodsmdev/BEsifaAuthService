@@ -77,12 +77,15 @@ public class AuthController {
             String authHeader) {
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            log.info("Logout fallido: Authorization header inválido");
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "Authorization header inválido"));
         }
 
+        log.info("Logout request");
         authService.logout(authHeader);
 
+        log.info("Logout exitoso");
         return ResponseEntity.ok(
                 Map.of("message", "Logout successful"));
     }
@@ -102,6 +105,7 @@ public class AuthController {
             String authHeader) {
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            log.info("Validación fallida: Authorization header inválido o ausente");
             return ResponseEntity.badRequest().body(
                     Map.of(
                             "valid", false,
@@ -109,10 +113,12 @@ public class AuthController {
         }
 
         String token = authHeader.substring(7);
+        log.info("Validación de token solicitada");
 
         var storedToken = tokenRepository.findByToken(token).orElse(null);
 
         if (storedToken == null) {
+            log.info("Token no encontrado en base de datos");
             return ResponseEntity.ok(
                     Map.of(
                             "valid", false,
@@ -120,6 +126,7 @@ public class AuthController {
         }
 
         if (storedToken.isExpired()) {
+            log.info("Token expirado: {}", storedToken.getUser().getEmail());
             return ResponseEntity.ok(
                     Map.of(
                             "valid", false,
@@ -128,6 +135,7 @@ public class AuthController {
         }
 
         if (storedToken.isRevoked()) {
+            log.info("Token revocado: {}", storedToken.getUser().getEmail());
             return ResponseEntity.ok(
                     Map.of(
                             "valid", false,
@@ -135,6 +143,7 @@ public class AuthController {
                             "revoked", true));
         }
 
+        log.info("Token válido para usuario: {}", storedToken.getUser().getEmail());
         return ResponseEntity.ok(
                 Map.of(
                         "valid", true,
@@ -159,8 +168,10 @@ public class AuthController {
     public ResponseEntity<AuthResponseDTO> refresh(
             @RequestBody RefreshTokenRequestDTO request) {
 
-        return ResponseEntity.ok(
-                authService.refresh(request.refreshToken()));
+        log.info("Refresh token solicitado");
+        var response = authService.refresh(request.refreshToken());
+        log.info("Refresh token exitoso");
+        return ResponseEntity.ok(response);
     }
 
     private List<String> resolveRoles(UserEntity user) {
