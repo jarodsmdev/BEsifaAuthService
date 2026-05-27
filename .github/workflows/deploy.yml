@@ -80,11 +80,10 @@ jobs:
             -i key.pem \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
-            -o ProxyJump=ubuntu@${EC2_HOST} \
+            -o ProxyCommand="ssh -i key.pem -W %h:%p -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@${EC2_HOST}" \
             auth.env \
             ubuntu@${AUTH_PRIVATE_HOST}:/tmp/auth.env
 
-      # Deploy remotely through bastion
       # Deploy remotely through bastion
       - name: Deploy Auth Service
         run: |
@@ -92,7 +91,7 @@ jobs:
             -i key.pem \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
-            -o ProxyJump=ubuntu@${EC2_HOST} \
+            -o ProxyCommand="ssh -i key.pem -W %h:%p -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@${EC2_HOST}" \
             ubuntu@${AUTH_PRIVATE_HOST} << 'EOF'
 
                 set -e
