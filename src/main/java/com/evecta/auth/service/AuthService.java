@@ -3,8 +3,10 @@ package com.evecta.auth.service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
+import java.security.SecureRandom;
+import java.util.Base64;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -12,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.evecta.auth.dto.auth.AuthResponseDTO;
 import com.evecta.auth.dto.auth.LoginRequestDTO;
-import com.evecta.auth.dto.token.refresh.RefreshTokenResponseDTO;
 import com.evecta.auth.model.Token;
 import com.evecta.auth.model.UserEntity;
 import com.evecta.auth.model.UserRole;
@@ -31,6 +32,12 @@ public class AuthService {
     private final ITokenRepository tokenRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+
+    @Value("${app.jwt.expiration-seconds:3600}")
+    private long expirationSeconds;
+
+    @Value("${app.jwt.refresh-expiration-seconds:86400}")
+    private long refreshExpirationSeconds;
 
     @Transactional
     public AuthResponseDTO login(LoginRequestDTO loginRequest) {
@@ -145,7 +152,12 @@ public class AuthService {
     }
 
     private String generateRefreshToken() {
-        return UUID.randomUUID().toString();
+        SecureRandom secureRandom = new SecureRandom();
+        byte[] tokenBytes = new byte[64];
+        secureRandom.nextBytes(tokenBytes);
+        return Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(tokenBytes);
     }
 
     private void saveAccessToken(UserEntity user, String jwtToken) {
@@ -156,7 +168,7 @@ public class AuthService {
                 .tokenType(Token.TokenType.BEARER)
                 .expired(false)
                 .revoked(false)
-                .expiresAt(LocalDateTime.now().plusMinutes(15))
+                .expiresAt(LocalDateTime.now().plusSeconds(expirationSeconds))
                 .build();
 
         tokenRepository.save(token);
@@ -170,7 +182,7 @@ public class AuthService {
                 .tokenType(Token.TokenType.REFRESH)
                 .expired(false)
                 .revoked(false)
-                .expiresAt(LocalDateTime.now().plusDays(7))
+                .expiresAt(LocalDateTime.now().plusSeconds(refreshExpirationSeconds))
                 .build();
 
         tokenRepository.save(token);

@@ -53,6 +53,7 @@ services:
       # JWT
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION_SECONDS: 3600
+      JWT_REFRESH_EXPIRATION_SECONDS: 86400
     depends_on:
       auth_mysql:
         condition: service_healthy
