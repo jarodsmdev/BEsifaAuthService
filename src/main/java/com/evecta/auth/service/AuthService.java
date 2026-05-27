@@ -1,7 +1,9 @@
 package com.evecta.auth.service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -10,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.evecta.auth.dto.auth.AuthResponseDTO;
 import com.evecta.auth.dto.auth.LoginRequestDTO;
+import com.evecta.auth.dto.token.refresh.RefreshTokenResponseDTO;
 import com.evecta.auth.model.Token;
 import com.evecta.auth.model.UserEntity;
 import com.evecta.auth.model.UserRole;
@@ -53,26 +56,16 @@ public class AuthService {
 
     @Transactional
     public AuthResponseDTO issueTokenForUser(UserEntity user) {
+
         revokeAllUserTokens(user);
 
         AuthResponseDTO response = buildAuthResponse(user);
 
-        saveUserToken(user, response.getAccessToken());
+        saveAccessToken(user, response.getAccessToken());
+
+        saveRefreshToken(user, response.getRefreshToken());
 
         return response;
-    }
-
-    @SuppressWarnings("null")
-    private void saveUserToken(UserEntity user, String jwtToken) {
-        Token token = Token.builder()
-                .user(user)
-                .token(jwtToken)
-                .tokenType(Token.TokenType.BEARER)
-                .expired(false)
-                .revoked(false)
-                .build();
-
-        tokenRepository.save(token);
     }
 
     public void revokeAllUserTokens(UserEntity user) {
@@ -112,20 +105,19 @@ public class AuthService {
     private List<String> resolveRoles(UserEntity user) {
         List<String> roles = new ArrayList<>();
 
-        if (user.getRole() == UserRole.USER_APP){
+        if (user.getRole() == UserRole.USER_APP) {
             roles.add("USER_APP");
         }
 
-
-        if (user.getRole() == UserRole.USER_JPL){
+        if (user.getRole() == UserRole.USER_JPL) {
             roles.add("USER_JPL");
         }
 
-        if (user.getRole() == UserRole.USER_SUPERVISOR){
+        if (user.getRole() == UserRole.USER_SUPERVISOR) {
             roles.add("USER_SUPERVISOR");
         }
 
-        if (user.getRole() == UserRole.USER_ADMIN){
+        if (user.getRole() == UserRole.USER_ADMIN) {
             roles.add("USER_ADMIN");
 
         }
@@ -137,16 +129,89 @@ public class AuthService {
 
         List<String> roles = resolveRoles(user);
 
-        JwtService.AuthTokenData tokenData =
-                jwtService.generateToken(user, roles, List.of());
+        JwtService.AuthTokenData tokenData = jwtService.generateToken(user, roles, List.of());
+
+        String refreshToken = generateRefreshToken();
 
         return AuthResponseDTO.builder()
                 .accessToken(tokenData.token())
+                .refreshToken(refreshToken)
                 .tokenType("Bearer")
                 .sub(tokenData.sub())
                 .iat(tokenData.iat())
                 .exp(tokenData.exp())
                 .roles(tokenData.roles())
                 .build();
+    }
+
+    private String generateRefreshToken() {
+        return UUID.randomUUID().toString();
+    }
+
+    private void saveAccessToken(UserEntity user, String jwtToken) {
+
+        Token token = Token.builder()
+                .user(user)
+                .token(jwtToken)
+                .tokenType(Token.TokenType.BEARER)
+                .expired(false)
+                .revoked(false)
+                .expiresAt(LocalDateTime.now().plusMinutes(15))
+                .build();
+
+        tokenRepository.save(token);
+    }
+
+    private void saveRefreshToken(UserEntity user, String refreshToken) {
+
+        Token token = Token.builder()
+                .user(user)
+                .token(refreshToken)
+                .tokenType(Token.TokenType.REFRESH)
+                .expired(false)
+                .revoked(false)
+                .expiresAt(LocalDateTime.now().plusDays(7))
+                .build();
+
+        tokenRepository.save(token);
+    }
+
+    @Transactional
+    public AuthResponseDTO refresh(String refreshToken) {
+
+        Token storedToken = tokenRepository.findByToken(refreshToken)
+                .orElseThrow(() -> new IllegalArgumentException("Refresh token inválido"));
+
+        if (storedToken.isExpired() || storedToken.isRevoked()) {
+            throw new IllegalStateException("Refresh token inválido");
+        }
+
+        if (storedToken.getExpiresAt().isBefore(LocalDateTime.now())) {
+
+            storedToken.setExpired(true);
+
+            tokenRepository.save(storedToken);
+
+            throw new IllegalStateException("Refresh token expirado");
+        }
+
+        if (storedToken.getTokenType() != Token.TokenType.REFRESH) {
+            throw new IllegalStateException("Token inválido");
+        }
+
+        UserEntity user = storedToken.getUser();
+
+        // REVOCAR TOKENS ANTERIORES
+        revokeAllUserTokens(user);
+
+        // GENERAR NUEVOS TOKENS
+        AuthResponseDTO response = buildAuthResponse(user);
+
+        // GUARDAR NUEVOS TOKENS
+        saveAccessToken(user, response.getAccessToken());
+
+        saveRefreshToken(user, response.getRefreshToken());
+
+        return response;
     }
 }
