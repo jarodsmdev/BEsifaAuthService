@@ -14,11 +14,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.evecta.auth.dto.auth.AuthResponseDTO;
 import com.evecta.auth.dto.auth.LoginRequestDTO;
+import com.evecta.auth.dto.auth.PasswordResetRequestDTO;
 import com.evecta.auth.model.Token;
 import com.evecta.auth.model.UserEntity;
 import com.evecta.auth.model.UserRole;
 import com.evecta.auth.repository.ITokenRepository;
 import com.evecta.auth.repository.IUserRepository;
+import java.util.Random;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +34,7 @@ public class AuthService {
     private final ITokenRepository tokenRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final EmailService emailService;
 
     @Value("${app.jwt.expiration-seconds:3600}")
     private long expirationSeconds;
@@ -225,5 +228,98 @@ public class AuthService {
         saveRefreshToken(user, response.getRefreshToken());
 
         return response;
+    }
+
+    @Transactional
+    public void initiatePasswordRecovery(String email) {
+        log.info("Iniciando recuperación de contraseña para: {}", email);
+        UserEntity user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("El correo ingresado no se encuentra registrado"));
+
+        if (!user.isActive()) {
+            throw new IllegalArgumentException("Esta cuenta se encuentra inactiva. Contacte al administrador.");
+        }
+
+        // Generar código numérico de 6 dígitos
+        Random random = new Random();
+        String code = String.format("%06d", random.nextInt(1000000));
+
+        user.setRecoveryCode(code);
+        user.setRecoveryCodeExpiry(LocalDateTime.now().plusMinutes(15));
+        user.setRecoveryAttempts(0);
+
+        userRepository.save(user);
+
+        // Envío real del correo
+        emailService.sendRecoveryCode(user.getEmail(), code);
+    }
+
+    @Transactional(noRollbackFor = IllegalArgumentException.class)
+    public void resetPassword(PasswordResetRequestDTO request) {
+        log.info("Procesando restablecimiento de contraseña para: {}", request.getEmail());
+        UserEntity user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new IllegalArgumentException("El correo ingresado no se encuentra registrado"));
+
+        if (!user.isActive()) {
+            throw new IllegalArgumentException("Esta cuenta se encuentra inactiva. Contacte al administrador.");
+        }
+
+        if (user.getRecoveryCode() == null || user.getRecoveryCodeExpiry() == null) {
+            throw new IllegalArgumentException("No se ha solicitado una recuperación de contraseña o el código ya fue utilizado.");
+        }
+
+        // Validar expiración por tiempo
+        if (LocalDateTime.now().isAfter(user.getRecoveryCodeExpiry())) {
+            // Limpiar código expirado
+            user.setRecoveryCode(null);
+            user.setRecoveryCodeExpiry(null);
+            user.setRecoveryAttempts(0);
+            userRepository.save(user);
+            throw new IllegalArgumentException("El código de recuperación ha expirado. Por favor, solicite uno nuevo.");
+        }
+
+        // Validar intentos fallidos
+        int currentAttempts = user.getRecoveryAttempts() == null ? 0 : user.getRecoveryAttempts();
+        if (currentAttempts >= 3) {
+            // Limpiar código bloqueado
+            user.setRecoveryCode(null);
+            user.setRecoveryCodeExpiry(null);
+            user.setRecoveryAttempts(0);
+            userRepository.save(user);
+            throw new IllegalArgumentException("Código bloqueado por superar el límite de intentos (máximo 3). Por favor, solicite uno nuevo.");
+        }
+
+        // Validar coincidencia de código
+        if (!user.getRecoveryCode().equals(request.getCode())) {
+            int newAttempts = currentAttempts + 1;
+            user.setRecoveryAttempts(newAttempts);
+            int remaining = 3 - newAttempts;
+            userRepository.save(user);
+            
+            if (remaining <= 0) {
+                // Limpiar código inmediatamente al llegar al límite
+                user.setRecoveryCode(null);
+                user.setRecoveryCodeExpiry(null);
+                user.setRecoveryAttempts(0);
+                userRepository.save(user);
+                throw new IllegalArgumentException("Código incorrecto. Límite de intentos superado. Código bloqueado.");
+            }
+            throw new IllegalArgumentException("El código ingresado es incorrecto. Intentos restantes: " + remaining);
+        }
+
+        // Restablecer contraseña con éxito
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        
+        // Limpiar campos de recuperación
+        user.setRecoveryCode(null);
+        user.setRecoveryCodeExpiry(null);
+        user.setRecoveryAttempts(0);
+
+        userRepository.save(user);
+
+        // Revocar todos los tokens JWT antiguos para cerrar todas las sesiones activas
+        revokeAllUserTokens(user);
+
+        log.info("Restablecimiento de contraseña exitoso para usuario: {}", user.getEmail());
     }
 }
