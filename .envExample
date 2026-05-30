@@ -10,9 +10,12 @@ DB_USER=usuario_de_tu_base_de_datos
 DB_PASSWORD=password_de_tu_base_de_datos
 
 # ============================================
-# USER ADMIN CONFIG
+# USER ADMIN CONFIG (Credenciales iniciales del Administrador de la plataforma)
 # ============================================
+# Correo institucional del primer administrador de la municipalidad (Ej: sistemas@elquisco.cl)
+# Sirve para iniciar sesión por primera vez en la web de SIFA.
 ADMIN_EMAIL=correo@admin.com
+# Contraseña inicial para este administrador (Ej: ClaveSegura123)
 ADMIN_PASSWORD=password_admin
 
 # ============================================
@@ -33,3 +36,15 @@ BCRYPT_STRENGTH=10
 JWT_SECRET=tu_clave_secreta_para_jwt
 JWT_EXPIRATION_SECONDS=3600 # 1 hora
 JWT_REFRESH_EXPIRATION_SECONDS=86400 # 1 día
+
+# ============================================
+# SMTP MAIL CONFIG (Servidor de envío de correos para recuperar contraseñas)
+# ============================================
+# Servidor SMTP (Ej: smtp.gmail.com para Gmail, smtp.office365.com para Outlook)
+SPRING_MAIL_HOST=smtp.gmail.com
+# Puerto de conexión (Ej: 587 para TLS/STARTTLS, 465 para SSL)
+SPRING_MAIL_PORT=587
+# Cuenta de correo desde la cual la aplicación enviará los códigos (Ej: noreply.sifa@gmail.com)
+SPRING_MAIL_USERNAME=tu_correo_emisor@gmail.com
+# Contraseña de la cuenta de correo (En caso de Gmail, debe ser una "Contraseña de aplicación" de 16 caracteres)
+SPRING_MAIL_PASSWORD=tu_contraseña_de_aplicación_de_google

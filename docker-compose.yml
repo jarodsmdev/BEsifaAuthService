@@ -54,6 +54,12 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION_SECONDS: 3600
       JWT_REFRESH_EXPIRATION_SECONDS: 86400
+
+      # SMTP Mail Config
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp.gmail.com}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
     depends_on:
       auth_mysql:
         condition: service_healthy

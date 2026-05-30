@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.*;
 
 import com.evecta.auth.dto.auth.AuthResponseDTO;
 import com.evecta.auth.dto.auth.LoginRequestDTO;
+import com.evecta.auth.dto.auth.PasswordRecoveryRequestDTO;
+import com.evecta.auth.dto.auth.PasswordResetRequestDTO;
 import com.evecta.auth.dto.token.refresh.RefreshTokenRequestDTO;
 import com.evecta.auth.dto.token.refresh.RefreshTokenResponseDTO;
 import com.evecta.auth.model.UserEntity;
@@ -172,6 +174,34 @@ public class AuthController {
         var response = authService.refresh(request.refreshToken());
         log.info("Refresh token exitoso");
         return ResponseEntity.ok(response);
+    }
+
+    // SOLICITAR RECUPERACIÓN DE CONTRASEÑA
+    @Operation(
+            summary = "Solicitar recuperación de contraseña",
+            description = "Genera y envía un código de 6 dígitos al correo del usuario")
+    @ApiResponse(responseCode = "200", description = "Código enviado con éxito")
+    @PostMapping("/recovery/request")
+    public ResponseEntity<?> requestRecovery(
+            @Valid @RequestBody PasswordRecoveryRequestDTO request) {
+        
+        log.info("Solicitud de recuperación de contraseña para: {}", request.getEmail());
+        authService.initiatePasswordRecovery(request.getEmail());
+        return ResponseEntity.ok(Map.of("message", "Código de recuperación enviado con éxito."));
+    }
+
+    // RESTABLECER CONTRASEÑA
+    @Operation(
+            summary = "Restablecer contraseña",
+            description = "Valida el código de 6 dígitos e ingresa la nueva contraseña del usuario")
+    @ApiResponse(responseCode = "200", description = "Contraseña restablecida con éxito")
+    @PostMapping("/recovery/reset")
+    public ResponseEntity<?> resetPassword(
+            @Valid @RequestBody PasswordResetRequestDTO request) {
+        
+        log.info("Restablecimiento de contraseña solicitado para: {}", request.getEmail());
+        authService.resetPassword(request);
+        return ResponseEntity.ok(Map.of("message", "Contraseña restablecida con éxito."));
     }
 
     private List<String> resolveRoles(UserEntity user) {
