@@ -72,7 +72,7 @@ jobs:
           SPRING_MAIL_USERNAME=${SPRING_MAIL_USERNAME}
           SPRING_MAIL_PASSWORD=${SPRING_MAIL_PASSWORD}
           
-          CORE_SERVICE_URL= ${CORE_SERVICE_URL}
+          CORE_SERVICE_URL=${CORE_SERVICE_URL}
           EOF
 
       # Create temporary SSH key
