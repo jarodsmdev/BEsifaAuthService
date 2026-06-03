@@ -18,7 +18,7 @@ services:
     networks:
       - sifa-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password_segura"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password_segura" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -60,6 +60,9 @@ services:
       SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
       SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
       SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+
+      # url del core para logs de auditoria
+      CORE_SERVICE_URL: ${CORE_SERVICE_URL}
     depends_on:
       auth_mysql:
         condition: service_healthy
