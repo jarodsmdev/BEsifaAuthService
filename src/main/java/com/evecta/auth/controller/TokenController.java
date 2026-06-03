@@ -81,7 +81,7 @@ public class TokenController {
               examples =
                   @ExampleObject(
                       value =
-                          "{\n  \"idToken\": 1,\n  \"token\": \"eyJhb***********\",\n  \"tokenType\": \"ACCESS\",\n  \"revoked\": false,\n  \"expired\": false,\n  \"userRut\": \"12345678-9\",\n  \"userEmail\": \"usuario@ejemplo.com\",\n  \"userName\": \"Juan\",\n  \"userLastName\": \"Pérez\"\n}")))
+                          "{\n  \"idToken\": 1,\n  \"token\": \"eyJhb***********\",\n  \"tokenType\": \"ACCESS\",\n  \"revoked\": false,\n  \"expired\": false,\n  \"expiresAt\": \"2023-01-01T13:00:00\",\n  \"createdAt\": \"2023-01-01T12:00:00\",\n  \"modifiedAt\": \"2023-01-01T12:00:00\",\n  \"userRut\": \"12345678-9\",\n  \"userEmail\": \"usuario@ejemplo.com\",\n  \"userName\": \"Juan\",\n  \"userLastName\": \"Pérez\"\n}")))
   @ApiResponse(
       responseCode = "404",
       description =
@@ -120,7 +120,7 @@ public class TokenController {
               examples =
                   @ExampleObject(
                       value =
-                          "[\n  {\n    \"idToken\": 1,\n    \"token\": \"eyJhb***********\",\n    \"tokenType\": \"ACCESS\",\n    \"revoked\": false,\n    \"expired\": false,\n    \"userRut\": \"12345678-9\",\n    \"userEmail\": \"usuario@ejemplo.com\",\n    \"userName\": \"Juan\",\n    \"userLastName\": \"Pérez\"\n  }\n]")))
+                          "[\n  {\n    \"idToken\": 1,\n    \"token\": \"eyJhb***********\",\n    \"tokenType\": \"ACCESS\",\n    \"revoked\": false,\n    \"expired\": false,\n    \"expiresAt\": \"2023-01-01T13:00:00\",\n    \"createdAt\": \"2023-01-01T12:00:00\",\n    \"modifiedAt\": \"2023-01-01T12:00:00\",\n    \"userRut\": \"12345678-9\",\n    \"userEmail\": \"usuario@ejemplo.com\",\n    \"userName\": \"Juan\",\n    \"userLastName\": \"Pérez\"\n  }\n]")))
   @ApiResponse(
       responseCode = "401",
       description = "No autorizado - Token JWT faltante, inválido o expirado",
@@ -150,7 +150,7 @@ public class TokenController {
               examples =
                   @ExampleObject(
                       value =
-                          "{\n  \"idToken\": 1,\n  \"token\": \"eyJhb***********\",\n  \"tokenType\": \"ACCESS\",\n  \"revoked\": true,\n  \"expired\": false,\n  \"userRut\": \"12345678-9\",\n  \"userEmail\": \"usuario@ejemplo.com\",\n  \"userName\": \"Juan\",\n  \"userLastName\": \"Pérez\"\n}")))
+                          "{\n  \"idToken\": 1,\n  \"token\": \"eyJhb***********\",\n  \"tokenType\": \"ACCESS\",\n  \"revoked\": true,\n  \"expired\": false,\n  \"expiresAt\": \"2023-01-01T13:00:00\",\n  \"createdAt\": \"2023-01-01T12:00:00\",\n  \"modifiedAt\": \"2023-01-01T12:30:00\",\n  \"userRut\": \"12345678-9\",\n  \"userEmail\": \"usuario@ejemplo.com\",\n  \"userName\": \"Juan\",\n  \"userLastName\": \"Pérez\"\n}")))
   @ApiResponse(
       responseCode = "404",
       description =
@@ -200,7 +200,7 @@ public class TokenController {
               examples =
                   @ExampleObject(
                       value =
-                          "{\n  \"idToken\": 1,\n  \"token\": \"eyJhb***********\",\n  \"tokenType\": \"ACCESS\",\n  \"revoked\": false,\n  \"expired\": true,\n  \"userRut\": \"12345678-9\",\n  \"userEmail\": \"usuario@ejemplo.com\",\n  \"userName\": \"Juan\",\n  \"userLastName\": \"Pérez\"\n}")))
+                          "{\n  \"idToken\": 1,\n  \"token\": \"eyJhb***********\",\n  \"tokenType\": \"ACCESS\",\n  \"revoked\": false,\n  \"expired\": true,\n  \"expiresAt\": \"2023-01-01T13:00:00\",\n  \"createdAt\": \"2023-01-01T12:00:00\",\n  \"modifiedAt\": \"2023-01-01T12:30:00\",\n  \"userRut\": \"12345678-9\",\n  \"userEmail\": \"usuario@ejemplo.com\",\n  \"userName\": \"Juan\",\n  \"userLastName\": \"Pérez\"\n}")))
   @ApiResponse(
       responseCode = "404",
       description =

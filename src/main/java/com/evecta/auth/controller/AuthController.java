@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.*;
 
 import com.evecta.auth.dto.auth.AuthResponseDTO;
 import com.evecta.auth.dto.auth.LoginRequestDTO;
+import com.evecta.auth.dto.auth.PasswordRecoveryRequestDTO;
+import com.evecta.auth.dto.auth.PasswordResetRequestDTO;
 import com.evecta.auth.dto.token.refresh.RefreshTokenRequestDTO;
 import com.evecta.auth.dto.token.refresh.RefreshTokenResponseDTO;
 import com.evecta.auth.model.UserEntity;
@@ -77,12 +79,15 @@ public class AuthController {
             String authHeader) {
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            log.info("Logout fallido: Authorization header inválido");
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "Authorization header inválido"));
         }
 
+        log.info("Logout request");
         authService.logout(authHeader);
 
+        log.info("Logout exitoso");
         return ResponseEntity.ok(
                 Map.of("message", "Logout successful"));
     }
@@ -102,6 +107,7 @@ public class AuthController {
             String authHeader) {
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            log.info("Validación fallida: Authorization header inválido o ausente");
             return ResponseEntity.badRequest().body(
                     Map.of(
                             "valid", false,
@@ -109,10 +115,12 @@ public class AuthController {
         }
 
         String token = authHeader.substring(7);
+        log.info("Validación de token solicitada");
 
         var storedToken = tokenRepository.findByToken(token).orElse(null);
 
         if (storedToken == null) {
+            log.info("Token no encontrado en base de datos");
             return ResponseEntity.ok(
                     Map.of(
                             "valid", false,
@@ -120,6 +128,7 @@ public class AuthController {
         }
 
         if (storedToken.isExpired()) {
+            log.info("Token expirado: {}", storedToken.getUser().getEmail());
             return ResponseEntity.ok(
                     Map.of(
                             "valid", false,
@@ -128,6 +137,7 @@ public class AuthController {
         }
 
         if (storedToken.isRevoked()) {
+            log.info("Token revocado: {}", storedToken.getUser().getEmail());
             return ResponseEntity.ok(
                     Map.of(
                             "valid", false,
@@ -135,6 +145,7 @@ public class AuthController {
                             "revoked", true));
         }
 
+        log.info("Token válido para usuario: {}", storedToken.getUser().getEmail());
         return ResponseEntity.ok(
                 Map.of(
                         "valid", true,
@@ -159,8 +170,38 @@ public class AuthController {
     public ResponseEntity<AuthResponseDTO> refresh(
             @RequestBody RefreshTokenRequestDTO request) {
 
-        return ResponseEntity.ok(
-                authService.refresh(request.refreshToken()));
+        log.info("Refresh token solicitado");
+        var response = authService.refresh(request.refreshToken());
+        log.info("Refresh token exitoso");
+        return ResponseEntity.ok(response);
+    }
+
+    // SOLICITAR RECUPERACIÓN DE CONTRASEÑA
+    @Operation(
+            summary = "Solicitar recuperación de contraseña",
+            description = "Genera y envía un código de 6 dígitos al correo del usuario")
+    @ApiResponse(responseCode = "200", description = "Código enviado con éxito")
+    @PostMapping("/recovery/request")
+    public ResponseEntity<?> requestRecovery(
+            @Valid @RequestBody PasswordRecoveryRequestDTO request) {
+        
+        log.info("Solicitud de recuperación de contraseña para: {}", request.getEmail());
+        authService.initiatePasswordRecovery(request.getEmail());
+        return ResponseEntity.ok(Map.of("message", "Código de recuperación enviado con éxito."));
+    }
+
+    // RESTABLECER CONTRASEÑA
+    @Operation(
+            summary = "Restablecer contraseña",
+            description = "Valida el código de 6 dígitos e ingresa la nueva contraseña del usuario")
+    @ApiResponse(responseCode = "200", description = "Contraseña restablecida con éxito")
+    @PostMapping("/recovery/reset")
+    public ResponseEntity<?> resetPassword(
+            @Valid @RequestBody PasswordResetRequestDTO request) {
+        
+        log.info("Restablecimiento de contraseña solicitado para: {}", request.getEmail());
+        authService.resetPassword(request);
+        return ResponseEntity.ok(Map.of("message", "Contraseña restablecida con éxito."));
     }
 
     private List<String> resolveRoles(UserEntity user) {

@@ -1,5 +1,7 @@
 package com.evecta.auth.dto.token;
 
+import java.time.LocalDateTime;
+
 import com.evecta.auth.model.Token;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,6 +19,9 @@ public class TokenResponseDTO {
     private String tokenType;
     private boolean revoked;
     private boolean expired;
+    private LocalDateTime expiresAt;
+    private LocalDateTime createdAt;
+    private LocalDateTime modifiedAt;
     private String userRut;
     private String userEmail;
     private String userName;
@@ -37,6 +42,9 @@ public class TokenResponseDTO {
                 .tokenType(token.getTokenType().name())
                 .revoked(token.isRevoked())
                 .expired(token.isExpired())
+                .expiresAt(token.getExpiresAt())
+                .createdAt(token.getCreatedAt())
+                .modifiedAt(token.getModifiedAt())
                 .userRut(token.getUser().getRut())
                 .userEmail(token.getUser().getEmail())
                 .userName(token.getUser().getName())

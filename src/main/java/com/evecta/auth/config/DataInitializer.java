@@ -29,8 +29,15 @@ public class DataInitializer {
     @SuppressWarnings("null")
     CommandLineRunner initAdminUser() {
         return args -> {
-            if (userRepository.findByEmail(adminEmail).isPresent()) {
-                log.info("[!] Usuario admin ya existe");
+            UserEntity existingAdmin = userRepository.findByRut("11111111").orElse(null);
+            if (existingAdmin != null) {
+                if (!existingAdmin.getEmail().equals(adminEmail)) {
+                    log.info("[!] Actualizando correo del admin a: {}", adminEmail);
+                    existingAdmin.setEmail(adminEmail);
+                    userRepository.save(existingAdmin);
+                } else {
+                    log.info("[!] Usuario admin ya existe con correo: {}", adminEmail);
+                }
                 return;
             }
 

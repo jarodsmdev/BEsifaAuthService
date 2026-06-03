@@ -2,9 +2,6 @@ package com.evecta.auth.model;
 
 import java.time.LocalDateTime;
 
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -21,7 +18,7 @@ public class Token {
     @GeneratedValue(strategy =  GenerationType.IDENTITY)
     public Long idToken;
 
-    @Column(unique = true)
+    @Column(unique = true, length = 1000)
     public String token;
 
     @Enumerated(EnumType.STRING)
@@ -33,12 +30,23 @@ public class Token {
 
     private LocalDateTime expiresAt;
 
-    @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @LastModifiedDate
+    @Column(nullable = false)
     private LocalDateTime modifiedAt;
+
+    @PrePersist
+    private void prePersist() {
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) createdAt = now;
+        if (modifiedAt == null) modifiedAt = now;
+    }
+
+    @PreUpdate
+    private void preUpdate() {
+        modifiedAt = LocalDateTime.now();
+    }
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
