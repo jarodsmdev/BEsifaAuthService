@@ -71,6 +71,8 @@ jobs:
           SPRING_MAIL_PORT=${SPRING_MAIL_PORT}
           SPRING_MAIL_USERNAME=${SPRING_MAIL_USERNAME}
           SPRING_MAIL_PASSWORD=${SPRING_MAIL_PASSWORD}
+          
+          CORE_SERVICE_URL= ${CORE_SERVICE_URL}
           EOF
 
       # Create temporary SSH key
@@ -82,46 +84,46 @@ jobs:
       # Copy env file to private auth server through bastion
       - name: Copy env file to auth server
         run: |
-            scp \
-            -i key.pem \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o ProxyCommand="ssh -i key.pem -W %h:%p -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@${EC2_HOST}" \
-            auth.env \
-            ubuntu@${AUTH_PRIVATE_HOST}:/tmp/auth.env
+          scp \
+          -i key.pem \
+          -o StrictHostKeyChecking=no \
+          -o UserKnownHostsFile=/dev/null \
+          -o ProxyCommand="ssh -i key.pem -W %h:%p -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@${EC2_HOST}" \
+          auth.env \
+          ubuntu@${AUTH_PRIVATE_HOST}:/tmp/auth.env
 
       # Deploy remotely through bastion
       - name: Deploy Auth Service
         run: |
-            ssh \
-            -i key.pem \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o ProxyCommand="ssh -i key.pem -W %h:%p -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@${EC2_HOST}" \
-            ubuntu@${AUTH_PRIVATE_HOST} << 'EOF'
-
-                set -e
-
-                trap "rm -f /tmp/auth.env" EXIT
-
-                echo "Pulling latest image..."
-                docker pull jarodsm/sifa-auth:latest
-
-                echo "Stopping old container..."
-                docker rm -f sifa-auth || true
-
-                echo "Starting new container..."
-                docker run -d \
-                --name sifa-auth \
-                --restart unless-stopped \
-                -p 80:8080 \
-                --env-file /tmp/auth.env \
-                -e SERVER_PORT=8080 \
-                jarodsm/sifa-auth:latest
-
-                echo "Deployment completed successfully."
-
-            EOF
+          ssh \
+          -i key.pem \
+          -o StrictHostKeyChecking=no \
+          -o UserKnownHostsFile=/dev/null \
+          -o ProxyCommand="ssh -i key.pem -W %h:%p -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ubuntu@${EC2_HOST}" \
+          ubuntu@${AUTH_PRIVATE_HOST} << 'EOF'
+          
+              set -e
+          
+              trap "rm -f /tmp/auth.env" EXIT
+          
+              echo "Pulling latest image..."
+              docker pull jarodsm/sifa-auth:latest
+          
+              echo "Stopping old container..."
+              docker rm -f sifa-auth || true
+          
+              echo "Starting new container..."
+              docker run -d \
+              --name sifa-auth \
+              --restart unless-stopped \
+              -p 80:8080 \
+              --env-file /tmp/auth.env \
+              -e SERVER_PORT=8080 \
+              jarodsm/sifa-auth:latest
+          
+              echo "Deployment completed successfully."
+          
+          EOF
 
       # Cleanup local temporary files
       - name: Cleanup
