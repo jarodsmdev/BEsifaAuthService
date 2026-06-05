@@ -22,11 +22,11 @@ public class AuditoriaService {
       log.debug("[AUDITORIA] Iniciando envío asíncrono -> Usuario: {} | Acción: {}", email, accion);
 
       AuditLogRequestDTO logRequest =
-              AuditLogRequestDTO.builder()
-                      .emailUsuario(email)
-                      .accion(accion)
-                      .detalles(detalles)
-                      .build();
+          AuditLogRequestDTO.builder()
+              .emailUsuario(email)
+              .accion(accion)
+              .detalles(detalles)
+              .build();
 
       log.debug("[AUDITORIA] Payload construido: {}", logRequest);
 

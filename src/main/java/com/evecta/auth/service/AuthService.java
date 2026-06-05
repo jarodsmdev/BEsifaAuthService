@@ -6,6 +6,7 @@ import java.util.List;
 import java.security.SecureRandom;
 import java.util.Base64;
 
+import com.evecta.auth.model.AuditAction;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -67,8 +68,8 @@ public class AuthService {
     // Auditar inicio de sesión
     auditoriaService.registrarAccionAsincrona(
         user.getEmail(),
-        "LOGIN",
-        java.util.Map.of("estado", "Exitoso", "rol", user.getRole().name()));
+        AuditAction.LOGIN.name(),
+        java.util.Map.of("Estado", "Exitoso", "rol", user.getRole().name()));
 
     return response;
   }
@@ -126,8 +127,8 @@ public class AuthService {
     // Auditar cierre de sesión
     auditoriaService.registrarAccionAsincrona(
         storedToken.getUser().getEmail(),
-        "LOGOUT",
-        java.util.Map.of("motivo", "Cierre de sesión manual o expiración de cliente"));
+        AuditAction.LOGOUT.name(),
+        java.util.Map.of("Motivo", "Cierre de sesión manual o expiración de cliente"));
   }
 
   private List<String> resolveRoles(UserEntity user) {
@@ -280,8 +281,8 @@ public class AuthService {
     // Auditar solicitud de recuperar contraseña
     auditoriaService.registrarAccionAsincrona(
         user.getEmail(),
-        "SOLICITUD_RECUPERACION_CLAVE",
-        java.util.Map.of("estado", "Correo de recuperación enviado"));
+        AuditAction.SOLICITUD_RECUPERACION_CLAVE.name(),
+        java.util.Map.of("Estado", "Correo de recuperación enviado"));
   }
 
   @Transactional(noRollbackFor = IllegalArgumentException.class)
@@ -365,10 +366,10 @@ public class AuthService {
     // Auditar cambio de contraseña
     auditoriaService.registrarAccionAsincrona(
         user.getEmail(),
-        "CAMBIO_CLAVE",
+        AuditAction.CAMBIO_CLAVE.name(),
         java.util.Map.of(
-            "estado", "Exitoso",
-            "motivo", "Recuperación de contraseña mediante código SMTP",
+            "Estado", "Exitoso",
+            "Motivo", "Recuperación de contraseña mediante código SMTP",
             "sesiones_antiguas_revocadas", true));
   }
 }

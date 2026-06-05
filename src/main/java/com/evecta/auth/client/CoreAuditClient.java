@@ -8,6 +8,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 @FeignClient(name = "core-service", url = "${core.service.url}")
 public interface CoreAuditClient {
 
-  @PostMapping("/internal/audit")
+  @PostMapping("/core/api/v1/internal/audit")
   void registrarLog(@RequestBody AuditLogRequestDTO request);
 }
