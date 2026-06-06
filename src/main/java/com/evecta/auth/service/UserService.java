@@ -35,7 +35,7 @@ public class UserService {
 
   @Transactional
   @SuppressWarnings("null")
-  public UserEntity createOrReactivateUser(UserCreateDTO userDTO) {
+  public UserEntity createOrReactivateUser(UserCreateDTO userDTO, String requestingUserEmail) {
     log.info("Creando usuario con RUT: {}", userDTO.getRut());
 
     // Validar RUT
@@ -72,9 +72,15 @@ public class UserService {
 
       // Auditar activación de usuario
       auditoriaService.registrarAccionAsincrona(
-          usuarioActualizado.getEmail(),
+          requestingUserEmail,
           AuditAction.USUARIO_ACTIVADO.name(),
-          java.util.Map.of("estado", "Exitoso", "rol", usuarioActualizado.getRole().name()));
+          "users",
+          usuarioActualizado.getRut(),
+          java.util.Map.of(
+              "usuario_afectado",
+              usuarioActualizado.getEmail(),
+              "rol_actual",
+              usuarioActualizado.getRole().name()));
 
       return usuarioActualizado;
     }
@@ -99,13 +105,24 @@ public class UserService {
             .isActive(true)
             .build();
 
-    // Auditar creación de usuario
     UserEntity usuarioCreado = userRepository.save(user);
+
     // Auditar creación de usuario
+    // Primero construimos el json para manejar posibles nulos
+    Map<String, Object> detalles = new HashMap<>();
+    detalles.put("rut_creado", usuarioCreado.getRut());
+    detalles.put("nombre", usuarioCreado.getName() + " " + usuarioCreado.getLastName());
+    detalles.put("rol_asignado", usuarioCreado.getRole().name());
+    detalles.put(
+        "telefono",
+        usuarioCreado.getPhone() != null ? usuarioCreado.getPhone() : "No especificado");
+
     auditoriaService.registrarAccionAsincrona(
-        usuarioCreado.getEmail(),
+        requestingUserEmail,
         AuditAction.USUARIO_CREADO.name(),
-        java.util.Map.of("estado", "Exitoso", "rol", usuarioCreado.getRole().name()));
+        "users",
+        usuarioCreado.getRut(),
+        detalles);
 
     return usuarioCreado;
   }
@@ -188,14 +205,18 @@ public class UserService {
 
     // Auditar desactivación de usuario
     auditoriaService.registrarAccionAsincrona(
-        updatedUser.getEmail(),
+        requestingUserEmail,
         AuditAction.USUARIO_DESACTIVADO.name(),
-        java.util.Map.of("Estado", "Exitoso", "rol", updatedUser.getRole().name()));
+        "users",
+        updatedUser.getRut(),
+        java.util.Map.of(
+            "usuario_afectado", updatedUser.getEmail(),
+            "rol_actual", updatedUser.getRole().name()));
     return UserResponseDTO.fromEntity(updatedUser);
   }
 
   @Transactional
-  public UserResponseDTO activateUserByRut(String rut) {
+  public UserResponseDTO activateUserByRut(String rut, String requestingUserEmail) {
     log.info("Activando usuario con RUT: {}", rut);
 
     UserEntity user =
@@ -214,15 +235,19 @@ public class UserService {
 
     // Auditar activación de usuario
     auditoriaService.registrarAccionAsincrona(
-        updatedUser.getEmail(),
+        requestingUserEmail,
         AuditAction.USUARIO_ACTIVADO.name(),
-        java.util.Map.of("Estado", "Exitoso", "rol", updatedUser.getRole().name()));
+        "users",
+        updatedUser.getRut(),
+        java.util.Map.of(
+            "usuario_afectado", updatedUser.getEmail(),
+            "rol_actual", updatedUser.getRole().name()));
     return UserResponseDTO.fromEntity(updatedUser);
   }
 
   @Transactional
   @SuppressWarnings("null")
-  public UserResponseDTO updateUser(String rut, UserUpdateDTO userDTO) {
+  public UserResponseDTO updateUser(String rut, UserUpdateDTO userDTO, String requestingUserEmail) {
     log.info("Actualizando usuario con RUT: {}", rut);
 
     UserEntity user =
@@ -268,18 +293,24 @@ public class UserService {
     // Registrar auditoría solo si hubo cambios
     if (!cambios.isEmpty()) {
       auditoriaService.registrarAccionAsincrona(
-          user.getEmail(), AuditAction.USUARIO_ACTUALIZADO.name(), cambios);
+          requestingUserEmail,
+          AuditAction.USUARIO_ACTUALIZADO.name(),
+          "users",
+          updatedUser.getRut(),
+          cambios);
     }
     return UserResponseDTO.fromEntity(updatedUser);
   }
 
   @Transactional
-  public UserResponseDTO updateUserRole(String rut, String roleName) {
+  public UserResponseDTO updateUserRole(String rut, String roleName, String requestingUserEmail) {
     log.info("Actualizando ROL para RUT: {} a {}", rut, roleName);
     UserEntity user =
         userRepository
             .findActiveByRut(rut)
             .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado o inactivo"));
+
+    String rolAnterior = user.getRole().name();
 
     try {
       UserRole role = UserRole.valueOf(roleName.toUpperCase());
@@ -292,9 +323,14 @@ public class UserService {
 
     // Auditar cambio de rol de usuario
     auditoriaService.registrarAccionAsincrona(
-        updatedUser.getEmail(),
+        requestingUserEmail,
         AuditAction.ROL_ACTUALIZADO.name(),
-        java.util.Map.of("Estado", "Exitoso", "Nuevo rol", updatedUser.getRole().name()));
+        "users",
+        updatedUser.getRut(),
+        java.util.Map.of(
+            "usuario_afectado", updatedUser.getEmail(),
+            "role_anterior", rolAnterior,
+            "rol_nuevo", updatedUser.getRole().name()));
     return UserResponseDTO.fromEntity(updatedUser);
   }
 
@@ -330,7 +366,11 @@ public class UserService {
     auditoriaService.registrarAccionAsincrona(
         updatedUser.getEmail(),
         AuditAction.USUARIO_DESACTIVADO.name(),
-        java.util.Map.of("Estado", "Exitoso", "rol", updatedUser.getRole().name()));
+        "users",
+        updatedUser.getRut(),
+        java.util.Map.of(
+            "usuario_afectado", updatedUser.getEmail(),
+            "rol_actual", updatedUser.getRole().name()));
     return UserResponseDTO.fromEntity(updatedUser);
   }
 }
