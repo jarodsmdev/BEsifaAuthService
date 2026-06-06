@@ -364,7 +364,7 @@ public class UserService {
 
     // Auditar desactivacion de usuario
     auditoriaService.registrarAccionAsincrona(
-        updatedUser.getEmail(),
+        requestingUserEmail,
         AuditAction.USUARIO_DESACTIVADO.name(),
         "users",
         updatedUser.getRut(),
