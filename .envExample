@@ -48,3 +48,6 @@ SPRING_MAIL_PORT=587
 SPRING_MAIL_USERNAME=tu_correo_emisor@gmail.com
 # Contraseña de la cuenta de correo (En caso de Gmail, debe ser una "Contraseña de aplicación" de 16 caracteres)
 SPRING_MAIL_PASSWORD=tu_contraseña_de_aplicación_de_google
+
+# URL interna para la comunicación directa por OpenFeign
+core.service.url=url_servicio_core

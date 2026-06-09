@@ -19,6 +19,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import com.evecta.auth.dto.user.UserCreateDTO;
@@ -60,11 +61,14 @@ public class UserController {
           "Datos de entrada inválidos, como un RUT no válido, un email ya registrado, o un usuario que ya existe y está activo.",
       content = @Content())
   @PostMapping
-  public ResponseEntity<UserResponseDTO> registerUser(@Valid @RequestBody UserCreateDTO userDTO) {
+  public ResponseEntity<UserResponseDTO> registerUser(
+      Authentication authentication, @Valid @RequestBody UserCreateDTO userDTO) {
 
     log.info("Registro usuario RUT: {}", userDTO.getRut());
 
-    UserEntity user = userService.createOrReactivateUser(userDTO);
+    String requestingUserEmail = authentication.getName();
+
+    UserEntity user = userService.createOrReactivateUser(userDTO, requestingUserEmail);
 
     return ResponseEntity.status(HttpStatus.CREATED).body(UserResponseDTO.fromEntity(user));
   }
@@ -199,10 +203,12 @@ public class UserController {
   @ApiResponse(responseCode = "404", description = "Usuario no encontrado.", content = @Content())
   @PatchMapping("/{rut}/activate")
   public ResponseEntity<UserResponseDTO> activateUser(
+      Authentication authentication,
       @Parameter(description = "RUT del usuario a activar", required = true) @PathVariable
           String rut) {
     log.info("Activando por RUT: {}", rut);
-    return ResponseEntity.ok(userService.activateUserByRut(rut));
+    String requestingUserEmail = authentication.getName();
+    return ResponseEntity.ok(userService.activateUserByRut(rut, requestingUserEmail));
   }
 
   @Operation(
@@ -226,11 +232,14 @@ public class UserController {
       content = @Content())
   @PatchMapping("/{rut}/role")
   public ResponseEntity<UserResponseDTO> updateUserRole(
+      Authentication authentication,
       @Parameter(description = "RUT del usuario cuyo rol se va a actualizar", required = true)
           @PathVariable
           String rut,
       @RequestBody UpdateUserRoleDTO roleDTO) {
-    return ResponseEntity.ok(userService.updateUserRole(rut, roleDTO.getRole()));
+    String requestingUserEmail = authentication.getName();
+    return ResponseEntity.ok(
+        userService.updateUserRole(rut, roleDTO.getRole(), requestingUserEmail));
   }
 
   @Operation(
@@ -254,11 +263,13 @@ public class UserController {
       content = @Content())
   @PutMapping("/{rut}")
   public ResponseEntity<UserResponseDTO> updateUser(
+      Authentication authentication,
       @Parameter(description = "RUT del usuario a actualizar", required = true) @PathVariable
           String rut,
       @Valid @RequestBody UserUpdateDTO userDTO) {
     log.info("Recibida solicitud de actualización para RUT: {}", rut);
-    UserResponseDTO updatedUser = userService.updateUser(rut, userDTO);
+    String requestingUserEmail = authentication.getName();
+    UserResponseDTO updatedUser = userService.updateUser(rut, userDTO, requestingUserEmail);
     return ResponseEntity.ok(updatedUser);
   }
 }

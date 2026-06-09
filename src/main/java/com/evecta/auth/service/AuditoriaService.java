@@ -16,17 +16,32 @@ public class AuditoriaService {
 
   private final CoreAuditClient coreAuditClient;
 
+  // MÉTODO ORIGINAL (Para Login/Logout donde no hay tabla ni ID afectados)
   @Async
   public void registrarAccionAsincrona(String email, String accion, Map<String, Object> detalles) {
+    // Delegamos la llamada al método principal enviando null en la tabla e id
+    this.registrarAccionAsincrona(email, accion, null, null, detalles);
+  }
+
+  // 2. NUEVO MÉTODO PRINCIPAL (Para operaciones CRUD)
+  @Async
+  public void registrarAccionAsincrona(
+      String email,
+      String accion,
+      String tablaAfectada,
+      String idRegistroAfectado,
+      Map<String, Object> detalles) {
     try {
       log.debug("[AUDITORIA] Iniciando envío asíncrono -> Usuario: {} | Acción: {}", email, accion);
 
       AuditLogRequestDTO logRequest =
-              AuditLogRequestDTO.builder()
-                      .emailUsuario(email)
-                      .accion(accion)
-                      .detalles(detalles)
-                      .build();
+          AuditLogRequestDTO.builder()
+              .emailUsuario(email)
+              .accion(accion)
+              .tablaAfectada((tablaAfectada))
+              .idRegistroAfectado(idRegistroAfectado)
+              .detalles(detalles)
+              .build();
 
       log.debug("[AUDITORIA] Payload construido: {}", logRequest);
 
