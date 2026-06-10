@@ -14,9 +14,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import com.evecta.auth.dto.auth.AuthResponseDTO;
+import com.evecta.auth.dto.auth.ChangePasswordRequestDTO;
 import com.evecta.auth.dto.auth.LoginRequestDTO;
 import com.evecta.auth.dto.auth.PasswordRecoveryRequestDTO;
 import com.evecta.auth.dto.auth.PasswordResetRequestDTO;
@@ -202,6 +205,24 @@ public class AuthController {
         log.info("Restablecimiento de contraseña solicitado para: {}", request.getEmail());
         authService.resetPassword(request);
         return ResponseEntity.ok(Map.of("message", "Contraseña restablecida con éxito."));
+    }
+
+    // CAMBIAR CONTRASEÑA (autenticado)
+    @Operation(
+            summary = "Cambiar contraseña",
+            description = "Permite al usuario autenticado cambiar su contraseña proporcionando la actual y una nueva. Revoca todos los tokens existentes.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponse(responseCode = "200", description = "Contraseña cambiada con éxito")
+    @PostMapping("/change-password")
+    @PreAuthorize("hasAnyAuthority('USER_APP', 'USER_JPL', 'USER_SUPERVISOR', 'USER_ADMIN')")
+    public ResponseEntity<?> changePassword(
+            Authentication authentication,
+            @Valid @RequestBody ChangePasswordRequestDTO request) {
+
+        String email = authentication.getName();
+        log.info("Cambio de contraseña para usuario: {}", email);
+        authService.changePassword(email, request);
+        return ResponseEntity.ok(Map.of("message", "Contraseña cambiada con éxito."));
     }
 
     private List<String> resolveRoles(UserEntity user) {
