@@ -1,6 +1,8 @@
 package com.evecta.auth.service;
 
 import java.util.List;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
@@ -81,5 +83,14 @@ public class TokenService implements ITokenService {
         Token updatedToken = tokenRepository.save(token);
         log.info("Token expirado exitosamente: {}", id);
         return TokenResponseDTO.fromEntity(updatedToken);
+    }
+
+    public String generateRefreshToken() {
+        SecureRandom secureRandom = new SecureRandom();
+        byte[] tokenBytes = new byte[64];
+        secureRandom.nextBytes(tokenBytes);
+        return Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(tokenBytes);
     }
 }

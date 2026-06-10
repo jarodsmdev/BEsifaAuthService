@@ -63,6 +63,16 @@ public class UserEntity {
     @Builder.Default
     private boolean isActive = true;
 
+    @Column(name = "recovery_code")
+    private String recoveryCode;
+
+    @Column(name = "recovery_code_expiry")
+    private LocalDateTime recoveryCodeExpiry;
+
+    @Column(name = "recovery_attempts", nullable = false)
+    @Builder.Default
+    private Integer recoveryAttempts = 0;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false, nullable = false)
     private LocalDateTime createdAt;
