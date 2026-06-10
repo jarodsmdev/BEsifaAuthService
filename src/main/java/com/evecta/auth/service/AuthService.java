@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.evecta.auth.dto.auth.AuthResponseDTO;
+import com.evecta.auth.dto.auth.ChangePasswordRequestDTO;
 import com.evecta.auth.dto.auth.LoginRequestDTO;
 import com.evecta.auth.dto.auth.PasswordResetRequestDTO;
 import com.evecta.auth.model.Token;
@@ -283,6 +284,37 @@ public class AuthService {
         user.getEmail(),
         AuditAction.SOLICITUD_RECUPERACION_CLAVE.name(),
         java.util.Map.of("Estado", "Correo de recuperación enviado"));
+  }
+
+  @Transactional
+  public void changePassword(String email, ChangePasswordRequestDTO request) {
+    log.info("Cambio de contraseña solicitado para: {}", email);
+
+    UserEntity user = userRepository.findByEmail(email)
+        .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+    if (!user.isActive()) {
+      throw new IllegalArgumentException("Esta cuenta se encuentra inactiva. Contacte al administrador.");
+    }
+
+    if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+      throw new IllegalArgumentException("La contraseña actual no es correcta");
+    }
+
+    if (request.getOldPassword().equals(request.getNewPassword())) {
+      throw new IllegalArgumentException("La nueva contraseña debe ser diferente a la actual");
+    }
+
+    user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+    userRepository.save(user);
+
+    revokeAllUserTokens(user);
+
+    log.info("Cambio de contraseña exitoso para: {}", email);
+    auditoriaService.registrarAccionAsincrona(
+        user.getEmail(),
+        AuditAction.CAMBIO_CLAVE.name(),
+        java.util.Map.of("Estado", "Exitoso", "Motivo", "Cambio voluntario desde app móvil", "sesiones_antiguas_revocadas", true));
   }
 
   @Transactional(noRollbackFor = IllegalArgumentException.class)
