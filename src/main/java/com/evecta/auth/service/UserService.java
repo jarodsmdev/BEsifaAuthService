@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import com.evecta.auth.dto.RutValidator;
 import com.evecta.auth.dto.user.UserCreateDTO;
@@ -152,13 +153,21 @@ public class UserService {
   }
 
   @Transactional(readOnly = true)
-  public Page<UserResponseDTO> findAllUsers(Pageable pageable) {
+  public Page<UserResponseDTO> findAllUsers(Pageable pageable, String search) {
     log.info(
-        "Listando usuarios - página: {}, tamaño: {}",
+        "Listando usuarios - página: {}, tamaño: {}, búsqueda: {}",
         pageable.getPageNumber(),
-        pageable.getPageSize());
+        pageable.getPageSize(),
+        search);
 
-    return userRepository.findAll(pageable).map(UserResponseDTO::fromEntity);
+    Page<UserEntity> userPage;
+    if (StringUtils.hasText(search)) {
+      userPage = userRepository.findByFilters(search, pageable);
+    } else {
+      userPage = userRepository.findAll(pageable);
+    }
+
+    return userPage.map(UserResponseDTO::fromEntity);
   }
 
   @Transactional(readOnly = true)

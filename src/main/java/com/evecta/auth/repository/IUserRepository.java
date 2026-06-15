@@ -1,8 +1,11 @@
 package com.evecta.auth.repository;
 
 import com.evecta.auth.model.UserEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -52,4 +55,15 @@ public interface IUserRepository extends JpaRepository<UserEntity, UUID> {
     // devuelve todos los usuarios fiscalizadores
     @Query("SELECT u FROM UserEntity u WHERE u.role = 'USER_APP'")
     List<UserEntity> findAllFiscalizadores();
+
+    /**
+     * Devuelve una página de usuarios filtrados por una cadena de búsqueda,
+     * ignorando mayúsculas y minúsculas, buscando en rut, nombre, apellidos o email.
+     */
+    @Query("SELECT u FROM UserEntity u WHERE " +
+           "LOWER(u.rut) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(u.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(u.lastName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))")
+    Page<UserEntity> findByFilters(@Param("search") String search, Pageable pageable);
 }
