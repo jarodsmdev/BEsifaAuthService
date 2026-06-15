@@ -46,7 +46,7 @@ public class AuthService {
   private long refreshExpirationSeconds;
 
   @Transactional
-  public AuthResponseDTO login(LoginRequestDTO loginRequest) {
+  public AuthResponseDTO login(LoginRequestDTO loginRequest, String clientOrigin) {
 
     UserEntity user =
         userRepository
@@ -60,6 +60,12 @@ public class AuthService {
 
     if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
       throw new BadCredentialsException("Correo o contraseña incorrectos");
+    }
+
+    if ("web".equalsIgnoreCase(clientOrigin) && user.getRole() == UserRole.USER_APP) {
+      log.warn("Bloqueado login desde web con rol USER_APP: {}", user.getEmail());
+      throw new BadCredentialsException(
+          "No tienes permisos para acceder a esta plataforma administrativa.");
     }
 
     AuthResponseDTO response = issueTokenForUser(user);

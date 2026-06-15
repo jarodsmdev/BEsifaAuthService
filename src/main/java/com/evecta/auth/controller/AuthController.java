@@ -60,11 +60,12 @@ public class AuthController {
     )
     @PostMapping("/login")
     public ResponseEntity<AuthResponseDTO> login(
-            @Valid @RequestBody LoginRequestDTO loginRequest) {
+            @Valid @RequestBody LoginRequestDTO loginRequest,
+            @RequestHeader("X-Client-Origin") String clientOrigin) {
 
-        log.info("Login request: {}", loginRequest.getEmail());
+        log.info("Login request: {} from origin: {}", loginRequest.getEmail(), clientOrigin);
 
-        return ResponseEntity.ok(authService.login(loginRequest));
+        return ResponseEntity.ok(authService.login(loginRequest, clientOrigin));
     }
 
     // LOGOUT
