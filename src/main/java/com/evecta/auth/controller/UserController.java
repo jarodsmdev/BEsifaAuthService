@@ -129,12 +129,16 @@ public class UserController {
   public ResponseEntity<Page<UserResponseDTO>> getAllUsers(
       @ParameterObject
           @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
-          Pageable pageable) {
+          Pageable pageable,
+      @Parameter(description = "Término de búsqueda para filtrar por rut, nombre, apellido o email")
+          @RequestParam(required = false)
+          String search) {
     log.info(
-        "Recibida solicitud para listar usuarios - página: {}, tamaño: {}",
+        "Recibida solicitud para listar usuarios - página: {}, tamaño: {}, búsqueda: {}",
         pageable.getPageNumber(),
-        pageable.getPageSize());
-    return ResponseEntity.ok(userService.findAllUsers(pageable));
+        pageable.getPageSize(),
+        search);
+    return ResponseEntity.ok(userService.findAllUsers(pageable, search));
   }
 
   @Operation(
