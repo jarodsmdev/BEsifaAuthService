@@ -4,6 +4,7 @@ import com.evecta.auth.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -11,16 +12,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-import java.util.Arrays;
-
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.security.config.Customizer;
 import org.springframework.http.HttpMethod;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -32,13 +28,24 @@ public class SecurityConfig {
                 //.cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        // Mapea el JSON/YAML base autogenerado por SpringDoc
+                        .requestMatchers("/v3/api-docs").permitAll()
+                        .requestMatchers("/v3/api-docs/**").permitAll()
+                        // Mapea la interfaz gráfica en caso de que desees consultarla localmente
+                        .requestMatchers("/swagger-ui.html").permitAll()
+                        .requestMatchers("/swagger-ui/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/api/v1/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/api/v1/refresh").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/api/v1/recovery/**").permitAll()
                         // Solo los ADMIN pueden crear, borrar o cambiar roles
                         .requestMatchers(HttpMethod.POST, "/auth/api/v1/users").hasAuthority("USER_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/auth/api/v1/users").hasAuthority("USER_ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/auth/api/v1/users/*/role").hasAuthority("USER_ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/auth/api/v1/users/*/activate").hasAuthority("USER_ADMIN")
+                        // Solo ADMIN pueden gestionar tokens
+                        .requestMatchers(HttpMethod.GET, "/auth/api/v1/tokens/**").hasAuthority("USER_ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/auth/api/v1/tokens/**").hasAuthority("USER_ADMIN")
                         // Cualquier usuario autenticado puede ver la lista
                         .anyRequest().authenticated())
                 .httpBasic(AbstractHttpConfigurer::disable)

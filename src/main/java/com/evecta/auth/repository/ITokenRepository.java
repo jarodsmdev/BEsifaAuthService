@@ -5,10 +5,16 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface ITokenRepository extends JpaRepository<Token, Long> {
 
     Optional<Token> findByToken(String token);
 
     List<Token> findAllByUser_RutAndExpiredFalseAndRevokedFalse(String rut);
+
+    List<Token> findAllByUser_Rut(String rut);
+
+    Page<Token> findAllByOrderByIdTokenDesc(Pageable pageable);
 }

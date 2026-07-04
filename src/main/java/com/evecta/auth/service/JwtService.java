@@ -22,7 +22,7 @@ public class JwtService {
     @Value("${app.jwt.secret}")
     private String jwtSecret;
 
-    @Value("${app.jwt.expiration-seconds:31536000}")
+    @Value("${app.jwt.expiration-seconds:900}") //15 minutos por default
     private long expirationSeconds;
 
     public AuthTokenData generateToken(UserEntity user, List<String> roles, List<String> permisos) {

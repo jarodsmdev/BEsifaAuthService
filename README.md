@@ -105,6 +105,15 @@ Si defines otro `SERVER_PORT`, cambia el puerto en la URL.
 ./mvnw test
 ```
 
+Para verificar cobertura con JaCoCo:
+```bash
+./mvnw verify
+# Reporte HTML: target/site/jacoco/index.html
+```
+
+Los tests usan H2 en lugar de MySQL (no requieren base de datos externa).
+Ver `TESTING.md` para documentación detallada sobre estrategia, cobertura y mapeo con el plan de pruebas.
+
 ## Logs
 
 Los logs se generan en:
