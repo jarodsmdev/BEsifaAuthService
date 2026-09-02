@@ -63,6 +63,8 @@ services:
 
       # url del core para logs de auditoria
       CORE_SERVICE_URL: ${CORE_SERVICE_URL}
+      # intervalo (ms) de reintento de eventos de auditoria pendientes
+      AUDIT_RETRY_INTERVAL_MS: ${AUDIT_RETRY_INTERVAL_MS:-30000}
     depends_on:
       auth_mysql:
         condition: service_healthy

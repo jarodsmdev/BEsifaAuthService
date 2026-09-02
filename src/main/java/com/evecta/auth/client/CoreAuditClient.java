@@ -1,11 +1,12 @@
 package com.evecta.auth.client;
 
+import com.evecta.auth.config.CoreAuditFeignConfig;
 import com.evecta.auth.dto.core.AuditLogRequestDTO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-@FeignClient(name = "core-service", url = "${core.service.url}")
+@FeignClient(name = "core-service", url = "${core.service.url}", configuration = CoreAuditFeignConfig.class)
 public interface CoreAuditClient {
 
   @PostMapping("/core/api/v1/internal/audit")

@@ -72,7 +72,7 @@ public class UserService {
       UserEntity usuarioActualizado = userRepository.save(existingUser);
 
       // Auditar activación de usuario
-      auditoriaService.registrarAccionAsincrona(
+      auditoriaService.registrarAccion(
           requestingUserEmail,
           AuditAction.USUARIO_ACTIVADO.name(),
           "users",
@@ -118,7 +118,7 @@ public class UserService {
         "telefono",
         usuarioCreado.getPhone() != null ? usuarioCreado.getPhone() : "No especificado");
 
-    auditoriaService.registrarAccionAsincrona(
+    auditoriaService.registrarAccion(
         requestingUserEmail,
         AuditAction.USUARIO_CREADO.name(),
         "users",
@@ -213,7 +213,7 @@ public class UserService {
     log.info("Usuario desactivado exitosamente: {}", rut);
 
     // Auditar desactivación de usuario
-    auditoriaService.registrarAccionAsincrona(
+    auditoriaService.registrarAccion(
         requestingUserEmail,
         AuditAction.USUARIO_DESACTIVADO.name(),
         "users",
@@ -243,7 +243,7 @@ public class UserService {
     log.info("Usuario activado exitosamente: {}", rut);
 
     // Auditar activación de usuario
-    auditoriaService.registrarAccionAsincrona(
+    auditoriaService.registrarAccion(
         requestingUserEmail,
         AuditAction.USUARIO_ACTIVADO.name(),
         "users",
@@ -301,7 +301,7 @@ public class UserService {
     UserEntity updatedUser = userRepository.save(user);
     // Registrar auditoría solo si hubo cambios
     if (!cambios.isEmpty()) {
-      auditoriaService.registrarAccionAsincrona(
+      auditoriaService.registrarAccion(
           requestingUserEmail,
           AuditAction.USUARIO_ACTUALIZADO.name(),
           "users",
@@ -331,7 +331,7 @@ public class UserService {
     UserEntity updatedUser = userRepository.save(user);
 
     // Auditar cambio de rol de usuario
-    auditoriaService.registrarAccionAsincrona(
+    auditoriaService.registrarAccion(
         requestingUserEmail,
         AuditAction.ROL_ACTUALIZADO.name(),
         "users",
@@ -372,7 +372,7 @@ public class UserService {
     log.info("Usuario desactivado exitosamente: {}", email);
 
     // Auditar desactivacion de usuario
-    auditoriaService.registrarAccionAsincrona(
+    auditoriaService.registrarAccion(
         requestingUserEmail,
         AuditAction.USUARIO_DESACTIVADO.name(),
         "users",
