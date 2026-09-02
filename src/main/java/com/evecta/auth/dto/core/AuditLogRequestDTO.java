@@ -3,6 +3,8 @@ package com.evecta.auth.dto.core;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
+import java.util.Map;
+
 @Getter
 @Setter
 @Builder
@@ -28,5 +30,5 @@ public class AuditLogRequestDTO {
   @Schema(
       description = "Detalles de la acción ejecutada encapsulada en un objeto JSON",
       example = "{}")
-  private Object detalles;
+  private Map<String, Object> detalles;
 }

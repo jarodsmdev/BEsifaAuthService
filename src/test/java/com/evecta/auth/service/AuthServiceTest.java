@@ -119,7 +119,7 @@ class AuthServiceTest {
         assertEquals("Bearer", response.getTokenType());
         assertEquals(activeUser.getEmail(), response.getSub());
         assertEquals(List.of("USER_ADMIN"), response.getRoles());
-        verify(auditoriaService).registrarAccionAsincrona(
+        verify(auditoriaService).registrarAccion(
                 eq(TEST_EMAIL),
                 eq("LOGIN"),
                 any(Map.class));
@@ -184,7 +184,7 @@ class AuthServiceTest {
         assertTrue(storedToken.isExpired());
         assertTrue(storedToken.isRevoked());
         verify(tokenRepository).save(storedToken);
-        verify(auditoriaService).registrarAccionAsincrona(
+        verify(auditoriaService).registrarAccion(
                 eq(TEST_EMAIL),
                 eq("LOGOUT"),
                 any(Map.class));
@@ -231,7 +231,7 @@ class AuthServiceTest {
 
         verify(userRepository).save(activeUser);
         assertEquals("encoded-new-password", activeUser.getPassword());
-        verify(auditoriaService).registrarAccionAsincrona(
+        verify(auditoriaService).registrarAccion(
                 eq(TEST_EMAIL),
                 eq("CAMBIO_CLAVE"),
                 any(Map.class));
@@ -249,7 +249,7 @@ class AuthServiceTest {
         assertEquals(0, activeUser.getRecoveryAttempts());
         verify(userRepository).save(activeUser);
         verify(emailService).sendRecoveryCode(eq(TEST_EMAIL), anyString());
-        verify(auditoriaService).registrarAccionAsincrona(
+        verify(auditoriaService).registrarAccion(
                 eq(TEST_EMAIL),
                 eq("SOLICITUD_RECUPERACION_CLAVE"),
                 any(Map.class));
@@ -272,7 +272,7 @@ class AuthServiceTest {
         assertNull(activeUser.getRecoveryCode());
         assertNull(activeUser.getRecoveryCodeExpiry());
         assertEquals(0, activeUser.getRecoveryAttempts());
-        verify(auditoriaService).registrarAccionAsincrona(
+        verify(auditoriaService).registrarAccion(
                 eq(TEST_EMAIL),
                 eq("CAMBIO_CLAVE"),
                 any(Map.class));

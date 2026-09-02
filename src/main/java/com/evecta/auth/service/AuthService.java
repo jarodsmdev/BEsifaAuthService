@@ -73,7 +73,7 @@ public class AuthService {
     log.info("Login exitoso para usuario: {}", user.getEmail());
 
     // Auditar inicio de sesión
-    auditoriaService.registrarAccionAsincrona(
+    auditoriaService.registrarAccion(
         user.getEmail(),
         AuditAction.LOGIN.name(),
         java.util.Map.of("Estado", "Exitoso", "rol", user.getRole().name()));
@@ -132,7 +132,7 @@ public class AuthService {
     log.info("Token revocado correctamente");
 
     // Auditar cierre de sesión
-    auditoriaService.registrarAccionAsincrona(
+    auditoriaService.registrarAccion(
         storedToken.getUser().getEmail(),
         AuditAction.LOGOUT.name(),
         java.util.Map.of("Motivo", "Cierre de sesión manual o expiración de cliente"));
@@ -286,7 +286,7 @@ public class AuthService {
     emailService.sendRecoveryCode(user.getEmail(), code);
 
     // Auditar solicitud de recuperar contraseña
-    auditoriaService.registrarAccionAsincrona(
+    auditoriaService.registrarAccion(
         user.getEmail(),
         AuditAction.SOLICITUD_RECUPERACION_CLAVE.name(),
         java.util.Map.of("Estado", "Correo de recuperación enviado"));
@@ -317,7 +317,7 @@ public class AuthService {
     revokeAllUserTokens(user);
 
     log.info("Cambio de contraseña exitoso para: {}", email);
-    auditoriaService.registrarAccionAsincrona(
+    auditoriaService.registrarAccion(
         user.getEmail(),
         AuditAction.CAMBIO_CLAVE.name(),
         java.util.Map.of("Estado", "Exitoso", "Motivo", "Cambio voluntario desde app móvil", "sesiones_antiguas_revocadas", true));
@@ -402,7 +402,7 @@ public class AuthService {
     log.info("Restablecimiento de contraseña exitoso para usuario: {}", user.getEmail());
 
     // Auditar cambio de contraseña
-    auditoriaService.registrarAccionAsincrona(
+    auditoriaService.registrarAccion(
         user.getEmail(),
         AuditAction.CAMBIO_CLAVE.name(),
         java.util.Map.of(

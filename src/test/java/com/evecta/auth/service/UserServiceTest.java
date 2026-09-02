@@ -87,7 +87,7 @@ class UserServiceTest {
         assertEquals(userCreateDTO.getEmail(), result.getEmail());
         assertEquals(userCreateDTO.getRole(), result.getRole());
         assertTrue(result.isActive());
-        verify(auditoriaService).registrarAccionAsincrona(
+        verify(auditoriaService).registrarAccion(
                 eq(REQUESTING_EMAIL),
                 eq("USUARIO_CREADO"),
                 eq("users"),
@@ -138,7 +138,7 @@ class UserServiceTest {
         assertTrue(result.isActive());
         assertEquals(reactivateDTO.getName(), result.getName());
         assertEquals(reactivateDTO.getEmail(), result.getEmail());
-        verify(auditoriaService).registrarAccionAsincrona(
+        verify(auditoriaService).registrarAccion(
                 eq(REQUESTING_EMAIL),
                 eq("USUARIO_ACTIVADO"),
                 eq("users"),
@@ -156,7 +156,7 @@ class UserServiceTest {
 
         assertFalse(result.isActive());
         verify(authService).revokeAllUserTokens(inactiveUser);
-        verify(auditoriaService).registrarAccionAsincrona(
+        verify(auditoriaService).registrarAccion(
                 eq(REQUESTING_EMAIL),
                 eq("USUARIO_DESACTIVADO"),
                 eq("users"),
@@ -180,7 +180,7 @@ class UserServiceTest {
         UserResponseDTO result = userService.activateUserByRut("22222222", REQUESTING_EMAIL);
 
         assertTrue(result.isActive());
-        verify(auditoriaService).registrarAccionAsincrona(
+        verify(auditoriaService).registrarAccion(
                 eq(REQUESTING_EMAIL),
                 eq("USUARIO_ACTIVADO"),
                 eq("users"),
@@ -197,7 +197,7 @@ class UserServiceTest {
 
         assertEquals("UpdatedName", result.getName());
         assertEquals("updated@example.com", result.getEmail());
-        verify(auditoriaService).registrarAccionAsincrona(
+        verify(auditoriaService).registrarAccion(
                 eq(REQUESTING_EMAIL),
                 eq("USUARIO_ACTUALIZADO"),
                 eq("users"),
@@ -213,7 +213,7 @@ class UserServiceTest {
         UserResponseDTO result = userService.updateUserRole(TEST_RUT, "USER_SUPERVISOR", REQUESTING_EMAIL);
 
         assertEquals("USER_SUPERVISOR", result.getRole());
-        verify(auditoriaService).registrarAccionAsincrona(
+        verify(auditoriaService).registrarAccion(
                 eq(REQUESTING_EMAIL),
                 eq("ROL_ACTUALIZADO"),
                 eq("users"),
