@@ -70,14 +70,12 @@ public final class TestDataBuilder {
 
     public static AuthResponseDTO createAuthResponseDTO() {
         return AuthResponseDTO.builder()
-                .accessToken("test-access-token")
-                .refreshToken("test-refresh-token")
-                .tokenType("Bearer")
-                .sub("test@example.com")
-                .iat(1678886400L)
-                .exp(1678890000L)
+                .email("test@example.com")
+                .name("Test")
+                .lastname("User")
+                .rut("11111111")
                 .roles(List.of("USER_ADMIN"))
-                .permisos(List.of())
+                .authType("cookie")
                 .build();
     }
 }

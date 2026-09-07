@@ -7,6 +7,7 @@ import java.security.SecureRandom;
 import java.util.Base64;
 
 import com.evecta.auth.model.AuditAction;
+import com.evecta.auth.dto.auth.SessionStatusDTO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -27,6 +28,18 @@ import java.util.Random;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Servicio de autenticación.
+ * 
+ * Responsabilidades:
+ * - Login/logout de usuarios
+ * - Generación y rotación de tokens (access + refresh)
+ * - Validación de sesiones
+ * - Gestión de recuperación de contraseñas
+ * 
+ * Los tokens se almacenan como cookies HttpOnly para mayor seguridad.
+ * El frontend nunca tiene acceso directo a los tokens.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -45,8 +58,33 @@ public class AuthService {
   @Value("${app.jwt.refresh-expiration-seconds:86400}")
   private long refreshExpirationSeconds;
 
+  /**
+   * Resultado del login que contiene tanto la respuesta del usuario como los tokens.
+   * 
+   * @param userResponse DTO con información del usuario (para el frontend)
+   * @param accessToken Token JWT de acceso (para cookie HttpOnly)
+   * @param refreshToken Refresh token opaco (para cookie HttpOnly)
+   */
+  public record LoginResult(AuthResponseDTO userResponse, String accessToken, String refreshToken) {
+  }
+
+  /**
+   * Autentica un usuario y genera tokens de sesión.
+   * 
+   * Flujo:
+   * 1. Valida credenciales
+   * 2. Verifica que la cuenta esté activa
+   * 3. Bloquea acceso web para usuarios móviles (USER_APP)
+   * 4. Genera tokens y los guarda en BD
+   * 5. Registra auditoría
+   * 
+   * @param loginRequest Credenciales del usuario
+   * @param clientOrigin Origen del cliente ("web" o "app")
+   * @return LoginResult con tokens y datos del usuario
+   * @throws BadCredentialsException si las credenciales son incorrectas
+   */
   @Transactional
-  public AuthResponseDTO login(LoginRequestDTO loginRequest, String clientOrigin) {
+  public LoginResult login(LoginRequestDTO loginRequest, String clientOrigin) {
 
     UserEntity user =
         userRepository
@@ -68,7 +106,14 @@ public class AuthService {
           "No tienes permisos para acceder a esta plataforma administrativa.");
     }
 
-    AuthResponseDTO response = issueTokenForUser(user);
+    // Generar tokens y guardar en BD
+    revokeAllUserTokens(user);
+    TokenData tokens = generateTokens(user);
+    saveAccessToken(user, tokens.accessToken());
+    saveRefreshToken(user, tokens.refreshToken());
+
+    // Construir respuesta del usuario
+    AuthResponseDTO userResponse = buildUserResponse(user);
 
     log.info("Login exitoso para usuario: {}", user.getEmail());
 
@@ -78,23 +123,18 @@ public class AuthService {
         AuditAction.LOGIN.name(),
         java.util.Map.of("Estado", "Exitoso", "rol", user.getRole().name()));
 
-    return response;
+    return new LoginResult(userResponse, tokens.accessToken(), tokens.refreshToken());
   }
 
-  @Transactional
-  public AuthResponseDTO issueTokenForUser(UserEntity user) {
-
-    revokeAllUserTokens(user);
-
-    AuthResponseDTO response = buildAuthResponse(user);
-
-    saveAccessToken(user, response.getAccessToken());
-
-    saveRefreshToken(user, response.getRefreshToken());
-
-    return response;
-  }
-
+  /**
+   * Revoca todos los tokens activos del usuario.
+   * 
+   * Este método marca como expirados Y revocados todos los tokens
+   * no expirados y no revocados del usuario. Se usa para implementar
+   * la política de "una sola sesión activa por usuario".
+   * 
+   * @param user Usuario cuyos tokens serán revocados
+   */
   public void revokeAllUserTokens(UserEntity user) {
     List<Token> validTokens =
         tokenRepository.findAllByUser_RutAndExpiredFalseAndRevokedFalse(user.getRut());
@@ -110,10 +150,15 @@ public class AuthService {
     }
   }
 
+  /**
+   * Cierra la sesión de un usuario revocando el token proporcionado.
+   * 
+   * @param token Token a revocar (puede venir de cookie o header Authorization)
+   * @throws IllegalArgumentException si el token es inválido
+   * @throws IllegalStateException si el token ya está invalidado
+   */
   @Transactional
-  public void logout(String authHeader) {
-
-    String token = authHeader.substring(7);
+  public void logout(String token) {
 
     Token storedToken =
         tokenRepository
@@ -138,6 +183,74 @@ public class AuthService {
         java.util.Map.of("Motivo", "Cierre de sesión manual o expiración de cliente"));
   }
 
+  /**
+   * Valida una sesión desde un token y retorna el estado de la sesión.
+   * 
+   * Este método es utilizado por el endpoint /status para verificar
+   * si la sesión del usuario es válida.
+   * 
+   * @param token Token JWT a validar
+   * @return SessionStatusDTO con el estado de la sesión
+   */
+  public SessionStatusDTO validateSession(String token) {
+
+    if (token == null || token.isBlank()) {
+      return SessionStatusDTO.builder()
+          .valid(false)
+          .error("No hay token de sesión")
+          .build();
+    }
+
+    // Validar firma y expiración del JWT
+    if (!jwtService.isTokenValid(token)) {
+      return SessionStatusDTO.builder()
+          .valid(false)
+          .error("Token inválido o expirado")
+          .build();
+    }
+
+    // Verificar en base de datos
+    var storedToken = tokenRepository.findByToken(token).orElse(null);
+
+    if (storedToken == null) {
+      return SessionStatusDTO.builder()
+          .valid(false)
+          .error("Token no encontrado")
+          .build();
+    }
+
+    if (storedToken.isExpired()) {
+      return SessionStatusDTO.builder()
+          .valid(false)
+          .error("Sesión expirada")
+          .build();
+    }
+
+    if (storedToken.isRevoked()) {
+      return SessionStatusDTO.builder()
+          .valid(false)
+          .error("Sesión revocada")
+          .build();
+    }
+
+    // Sesión válida - construir información del usuario
+    UserEntity user = storedToken.getUser();
+    List<String> roles = resolveRoles(user);
+
+    SessionStatusDTO.UserInfo userInfo = SessionStatusDTO.UserInfo.builder()
+        .email(user.getEmail())
+        .name(user.getName())
+        .lastname(user.getLastName())
+        .rut(user.getFullRut())
+        .roles(roles)
+        .build();
+
+    return SessionStatusDTO.builder()
+        .valid(true)
+        .user(userInfo)
+        .build();
+  }
+
   private List<String> resolveRoles(UserEntity user) {
     List<String> roles = new ArrayList<>();
 
@@ -160,7 +273,13 @@ public class AuthService {
     return roles;
   }
 
-  private AuthResponseDTO buildAuthResponse(UserEntity user) {
+  /**
+   * Genera los tokens (access + refresh) para un usuario.
+   * 
+   * @param user Usuario para el que se generan los tokens
+   * @return TokenData con el access token JWT y refresh token opaco
+   */
+  private TokenData generateTokens(UserEntity user) {
 
     List<String> roles = resolveRoles(user);
 
@@ -168,15 +287,37 @@ public class AuthService {
 
     String refreshToken = generateRefreshToken();
 
+    return new TokenData(tokenData.token(), refreshToken);
+  }
+
+  /**
+   * Construye la respuesta del DTO con la información del usuario.
+   * Los tokens NO se incluyen en el DTO (se establecen como cookies HttpOnly).
+   * 
+   * @param user Usuario autenticado
+   * @return AuthResponseDTO con información del usuario
+   */
+  private AuthResponseDTO buildUserResponse(UserEntity user) {
+
+    List<String> roles = resolveRoles(user);
+
     return AuthResponseDTO.builder()
-        .accessToken(tokenData.token())
-        .refreshToken(refreshToken)
-        .tokenType("Bearer")
-        .sub(tokenData.sub())
-        .iat(tokenData.iat())
-        .exp(tokenData.exp())
-        .roles(tokenData.roles())
+        .email(user.getEmail())
+        .name(user.getName())
+        .lastname(user.getLastName())
+        .rut(user.getFullRut())
+        .roles(roles)
+        .authType("cookie")
         .build();
+  }
+
+  /**
+   * Record interno para encapsular los tokens generados.
+   * 
+   * @param accessToken  Token JWT de acceso
+   * @param refreshToken Refresh token opaco
+   */
+  private record TokenData(String accessToken, String refreshToken) {
   }
 
   private String generateRefreshToken() {
@@ -216,8 +357,32 @@ public class AuthService {
     tokenRepository.save(token);
   }
 
+  /**
+   * Resultado del refresh que contiene tanto la respuesta del usuario como los tokens.
+   * 
+   * @param userResponse DTO con información del usuario (para el frontend)
+   * @param accessToken Nuevo token JWT de acceso (para cookie HttpOnly)
+   * @param refreshToken Nuevo refresh token opaco (para cookie HttpOnly)
+   */
+  public record RefreshResult(AuthResponseDTO userResponse, String accessToken, String refreshToken) {
+  }
+
+  /**
+   * Renueva los tokens usando un refresh token válido.
+   * 
+   * Este método implementa la rotación de refresh tokens:
+   * 1. Valida el refresh token actual
+   * 2. Revoca TODOS los tokens del usuario (incluyendo el actual)
+   * 3. Genera un nuevo par de tokens (access + refresh)
+   * 4. Guarda los nuevos tokens en la base de datos
+   * 
+   * @param refreshToken Refresh token actual a renovar
+   * @return RefreshResult con nuevos tokens y datos del usuario
+   * @throws IllegalArgumentException si el token es inválido
+   * @throws IllegalStateException si el token está expirado o revocado
+   */
   @Transactional
-  public AuthResponseDTO refresh(String refreshToken) {
+  public RefreshResult refresh(String refreshToken) {
 
     Token storedToken =
         tokenRepository
@@ -247,14 +412,17 @@ public class AuthService {
     revokeAllUserTokens(user);
 
     // GENERAR NUEVOS TOKENS
-    AuthResponseDTO response = buildAuthResponse(user);
+    TokenData tokens = generateTokens(user);
 
     // GUARDAR NUEVOS TOKENS
-    saveAccessToken(user, response.getAccessToken());
+    saveAccessToken(user, tokens.accessToken());
 
-    saveRefreshToken(user, response.getRefreshToken());
+    saveRefreshToken(user, tokens.refreshToken());
 
-    return response;
+    // Construir respuesta del usuario
+    AuthResponseDTO userResponse = buildUserResponse(user);
+
+    return new RefreshResult(userResponse, tokens.accessToken(), tokens.refreshToken());
   }
 
   @Transactional

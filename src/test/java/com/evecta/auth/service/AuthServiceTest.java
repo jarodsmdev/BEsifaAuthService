@@ -102,7 +102,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void login_conCredencialesValidas_retornaAuthResponse() {
+    void login_conCredencialesValidas_retornaLoginResult() {
         when(userRepository.findByEmail(TEST_EMAIL)).thenReturn(Optional.of(activeUser));
         when(passwordEncoder.matches(TEST_PASSWORD, activeUser.getPassword())).thenReturn(true);
         when(tokenRepository.findAllByUser_RutAndExpiredFalseAndRevokedFalse(activeUser.getRut()))
@@ -111,14 +111,17 @@ class AuthServiceTest {
                 .thenReturn(authTokenData);
         when(tokenRepository.save(any(Token.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        AuthResponseDTO response = authService.login(loginRequest, "web");
+        AuthService.LoginResult result = authService.login(loginRequest, "web");
 
-        assertNotNull(response);
-        assertEquals(authTokenData.token(), response.getAccessToken());
-        assertNotNull(response.getRefreshToken());
-        assertEquals("Bearer", response.getTokenType());
-        assertEquals(activeUser.getEmail(), response.getSub());
-        assertEquals(List.of("USER_ADMIN"), response.getRoles());
+        assertNotNull(result);
+        // El resultado contiene los tokens internos
+        assertNotNull(result.accessToken());
+        assertNotNull(result.refreshToken());
+        // Y la respuesta del usuario sin tokens
+        assertNotNull(result.userResponse());
+        assertEquals(activeUser.getEmail(), result.userResponse().getEmail());
+        assertEquals("cookie", result.userResponse().getAuthType());
+        assertEquals(List.of("USER_ADMIN"), result.userResponse().getRoles());
         verify(auditoriaService).registrarAccion(
                 eq(TEST_EMAIL),
                 eq("LOGIN"),
@@ -152,7 +155,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void login_userAppDesdeMobile_retornaTokens() {
+    void login_userAppDesdeMobile_retornaResult() {
         when(userRepository.findByEmail("userapp@example.com")).thenReturn(Optional.of(userAppUser));
         when(passwordEncoder.matches(TEST_PASSWORD, userAppUser.getPassword())).thenReturn(true);
         when(tokenRepository.findAllByUser_RutAndExpiredFalseAndRevokedFalse(userAppUser.getRut()))
@@ -165,21 +168,21 @@ class AuthServiceTest {
         when(tokenRepository.save(any(Token.class))).thenAnswer(inv -> inv.getArgument(0));
         LoginRequestDTO req = TestDataBuilder.createLoginRequest("userapp@example.com", TEST_PASSWORD);
 
-        AuthResponseDTO response = authService.login(req, "mobile");
+        AuthService.LoginResult result = authService.login(req, "mobile");
 
-        assertNotNull(response);
-        assertEquals(appTokenData.token(), response.getAccessToken());
-        assertEquals(List.of("USER_APP"), response.getRoles());
+        assertNotNull(result);
+        assertEquals(appTokenData.token(), result.accessToken());
+        assertEquals(List.of("USER_APP"), result.userResponse().getRoles());
     }
 
     @Test
     void logout_conTokenValido_revocaYAudita() {
-        String jwtToken = "Bearer valid-jwt-token";
+        String rawToken = "valid-jwt-token";
         Token storedToken = TestDataBuilder.createToken(activeUser, Token.TokenType.BEARER, false, false);
 
-        when(tokenRepository.findByToken("valid-jwt-token")).thenReturn(Optional.of(storedToken));
+        when(tokenRepository.findByToken(rawToken)).thenReturn(Optional.of(storedToken));
 
-        authService.logout(jwtToken);
+        authService.logout(rawToken);
 
         assertTrue(storedToken.isExpired());
         assertTrue(storedToken.isRevoked());
@@ -202,11 +205,15 @@ class AuthServiceTest {
                 .thenReturn(authTokenData);
         when(tokenRepository.save(any(Token.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        AuthResponseDTO response = authService.refresh("valid-refresh-token");
+        AuthService.RefreshResult result = authService.refresh("valid-refresh-token");
 
-        assertNotNull(response);
-        assertEquals(authTokenData.token(), response.getAccessToken());
-        assertNotNull(response.getRefreshToken());
+        assertNotNull(result);
+        // Contiene los nuevos tokens internamente
+        assertNotNull(result.accessToken());
+        assertNotNull(result.refreshToken());
+        // Y la respuesta del usuario sin tokens
+        assertNotNull(result.userResponse());
+        assertEquals(activeUser.getEmail(), result.userResponse().getEmail());
     }
 
     @Test

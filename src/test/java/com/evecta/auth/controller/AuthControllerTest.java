@@ -61,20 +61,24 @@ class AuthControllerTest {
     private JwtService jwtService;
 
     @Test
-    void login_conDatosValidos_retorna200() throws Exception {
+    void login_conDatosValidos_retorna200YEstableceCookies() throws Exception {
         LoginRequestDTO request = TestDataBuilder.createLoginRequest("test@example.com", "TestPass123");
         AuthResponseDTO response = TestDataBuilder.createAuthResponseDTO();
+        AuthService.LoginResult loginResult = new AuthService.LoginResult(
+                response, "access-token-value", "refresh-token-value");
 
-        when(authService.login(any(LoginRequestDTO.class), anyString())).thenReturn(response);
+        when(authService.login(any(LoginRequestDTO.class), anyString())).thenReturn(loginResult);
 
         mockMvc.perform(post("/auth/api/v1/login")
                         .header("X-Client-Origin", "mobile")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").value("test-access-token"))
-                .andExpect(jsonPath("$.refreshToken").value("test-refresh-token"))
-                .andExpect(jsonPath("$.roles").isArray());
+                .andExpect(jsonPath("$.email").value("test@example.com"))
+                .andExpect(jsonPath("$.roles").isArray())
+                // Verificar que NO se exponen tokens en el body JSON
+                .andExpect(jsonPath("$.accessToken").doesNotExist())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist());
     }
 
     @Test
@@ -107,13 +111,25 @@ class AuthControllerTest {
     }
 
     @Test
-    void logout_conTokenValido_retorna200() throws Exception {
+    void logout_conCookieValida_retorna200() throws Exception {
         Token validToken = TestDataBuilder.createToken(
                 TestDataBuilder.createUserEntity(UserRole.USER_ADMIN, "test@example.com", "11111111", "1"),
                 Token.TokenType.BEARER, false, false);
-        when(jwtService.isTokenValid(anyString())).thenReturn(true);
-        when(jwtService.extractUsername(anyString())).thenReturn("test@example.com");
-        when(jwtService.extractRoles(anyString())).thenReturn(List.of("USER_ADMIN"));
+        when(tokenRepository.findByToken(anyString())).thenReturn(Optional.of(validToken));
+        doNothing().when(authService).logout(anyString());
+
+        mockMvc.perform(post("/auth/api/v1/logout")
+                        .cookie(new jakarta.servlet.http.Cookie("access_token", "test-valid-token")))
+                .andExpect(status().isOk());
+
+        verify(authService).logout("test-valid-token");
+    }
+
+    @Test
+    void logout_conHeaderAuthorization_retorna200() throws Exception {
+        Token validToken = TestDataBuilder.createToken(
+                TestDataBuilder.createUserEntity(UserRole.USER_ADMIN, "test@example.com", "11111111", "1"),
+                Token.TokenType.BEARER, false, false);
         when(tokenRepository.findByToken(anyString())).thenReturn(Optional.of(validToken));
         doNothing().when(authService).logout(anyString());
 
@@ -121,7 +137,7 @@ class AuthControllerTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer test-valid-token"))
                 .andExpect(status().isOk());
 
-        verify(authService).logout(anyString());
+        verify(authService).logout("test-valid-token");
     }
 
     @Test
@@ -148,18 +164,65 @@ class AuthControllerTest {
     }
 
     @Test
-    void refresh_conTokenValido_retorna200() throws Exception {
+    void refresh_conCookieValida_retorna200() throws Exception {
+        AuthResponseDTO response = TestDataBuilder.createAuthResponseDTO();
+        AuthService.RefreshResult refreshResult = new AuthService.RefreshResult(
+                response, "new-access-token", "new-refresh-token");
+
+        when(authService.refresh(anyString())).thenReturn(refreshResult);
+
+        mockMvc.perform(post("/auth/api/v1/refresh")
+                        .cookie(new jakarta.servlet.http.Cookie("refresh_token", "test-refresh-token")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("test@example.com"))
+                .andExpect(jsonPath("$.roles").isArray())
+                // Verificar que NO se exponen tokens en el body JSON
+                .andExpect(jsonPath("$.accessToken").doesNotExist())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist());
+
+        verify(authService).refresh("test-refresh-token");
+    }
+
+    @Test
+    void refresh_conBody_retorna200() throws Exception {
         RefreshTokenRequestDTO request = new RefreshTokenRequestDTO("test-refresh-token");
         AuthResponseDTO response = TestDataBuilder.createAuthResponseDTO();
+        AuthService.RefreshResult refreshResult = new AuthService.RefreshResult(
+                response, "new-access-token", "new-refresh-token");
 
-        when(authService.refresh(anyString())).thenReturn(response);
+        when(authService.refresh(anyString())).thenReturn(refreshResult);
 
         mockMvc.perform(post("/auth/api/v1/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").value("test-access-token"))
-                .andExpect(jsonPath("$.refreshToken").value("test-refresh-token"));
+                .andExpect(jsonPath("$.email").value("test@example.com"));
+
+        verify(authService).refresh("test-refresh-token");
+    }
+
+    @Test
+    void sessionStatus_conCookieValida_retornaSesionActiva() throws Exception {
+        // Mock del servicio AuthService para /status
+        com.evecta.auth.dto.auth.SessionStatusDTO.UserInfo userInfo =
+                com.evecta.auth.dto.auth.SessionStatusDTO.UserInfo.builder()
+                        .email("test@example.com")
+                        .name("Test")
+                        .roles(List.of("USER_ADMIN"))
+                        .build();
+        com.evecta.auth.dto.auth.SessionStatusDTO status =
+                com.evecta.auth.dto.auth.SessionStatusDTO.builder()
+                        .valid(true)
+                        .user(userInfo)
+                        .build();
+
+        when(authService.validateSession(anyString())).thenReturn(status);
+
+        mockMvc.perform(get("/auth/api/v1/status")
+                        .cookie(new jakarta.servlet.http.Cookie("access_token", "test-token")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valid").value(true))
+                .andExpect(jsonPath("$.user.email").value("test@example.com"));
     }
 
     @Test

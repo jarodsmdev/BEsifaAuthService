@@ -53,12 +53,14 @@ class SecurityConfigTest {
     }
 
     @Test
-    @DisplayName("POST /auth/api/v1/refresh es público - retorna 200 sin auth")
+    @DisplayName("POST /auth/api/v1/refresh es público - retorna 400 por falta de refresh token, no 401")
     void refreshEndpoint_publico_retorna200() throws Exception {
+        // Sin cookie ni body con refresh token, retorna 400 (no 401), 
+        // lo que demuestra que el endpoint es público
         mockMvc.perform(post("/auth/api/v1/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isBadRequest());
     }
 
     @Test

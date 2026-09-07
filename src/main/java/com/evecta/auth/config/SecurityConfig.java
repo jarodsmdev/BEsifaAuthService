@@ -11,9 +11,27 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import org.springframework.http.HttpMethod;
 
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * Configuración de seguridad Spring.
+ * 
+ * Arquitectura:
+ * - Autenticación basada en tokens JWT en cookies HttpOnly
+ * - CSRF deshabilitado (protegido por SameSite=Strict en las cookies)
+ * - CORS habilitado con allowCredentials(true) para permitir cookies
+ * - Endpoints públicos: login, refresh, status, recovery, swagger
+ * 
+ * Endpoint /status se mantiene público ya que el frontend lo usa
+ * para verificar la sesión sin tener acceso directo al token.
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -25,7 +43,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                //.cors(Customizer.withDefaults())
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         // Mapea el JSON/YAML base autogenerado por SpringDoc
@@ -38,6 +56,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/auth/api/v1/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/api/v1/refresh").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/api/v1/recovery/**").permitAll()
+                        // El frontend consulta el estado de la sesión sin token explícito (usa cookie)
+                        .requestMatchers(HttpMethod.GET, "/auth/api/v1/status").permitAll()
                         // Solo los ADMIN pueden crear, borrar o cambiar roles
                         .requestMatchers(HttpMethod.POST, "/auth/api/v1/users").hasAuthority("USER_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/auth/api/v1/users").hasAuthority("USER_ADMIN")
@@ -54,23 +74,38 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // @Bean
-    // public CorsConfigurationSource corsConfigurationSource() {
-    //     CorsConfiguration configuration = new CorsConfiguration();
-    //     // Allow Vite frontend
-    //     configuration.setAllowedOrigins(Arrays.asList(
-    //             "https://sifacore.netlify.app",
-    //             "http://localhost:5173",
-    //             "http://localhost:3000"));
-    //     //configuration.setAllowCredentials(true); // Permitir cookies (si es necesario)
-    //     configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-    //     // configuration.setAllowedHeaders(Arrays.asList("Authorization",
-    //     // "Content-Type"));
-    //     configuration.setAllowedHeaders(Arrays.asList("*")); // Permitir todos los headers (incluyendo Authorization)
-    //     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    //     source.registerCorsConfiguration("/**", configuration);
-    //     return source;
-    // }
+    /**
+     * Configuración CORS.
+     * 
+     * allowCredentials(true) es REQUERIDO para que las cookies HttpOnly
+     * se envíen en peticiones cross-origin. Cuando se usan credenciales,
+     * no se puede usar "*" como origen: se debe listar explícitamente.
+     * 
+     * @return Fuente de configuración CORS
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        // Orígenes permitidos (no se puede usar "*" con allowCredentials=true)
+        configuration.setAllowedOrigins(List.of(
+                "https://sifacore.netlify.app",
+                "https://sifacore2.netlify.app",
+                "http://localhost:5173",
+                "http://localhost:3000",
+                "http://sifacore.s3-website-us-east-1.amazonaws.com",
+                "https://sifacore.s3.us-east-1.amazonaws.com"));
+        // Permitir credenciales (cookies) en peticiones cross-origin
+        configuration.setAllowCredentials(true);
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        // Exponer Set-Cookie para que el navegador guarde las cookies
+        configuration.setExposedHeaders(List.of("Set-Cookie"));
+        configuration.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
 
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
