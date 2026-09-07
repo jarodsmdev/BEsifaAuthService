@@ -1,6 +1,7 @@
 package com.evecta.auth.security;
 
 import com.evecta.auth.repository.ITokenRepository;
+import com.evecta.auth.util.CookieUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,6 +20,19 @@ import com.evecta.auth.service.JwtService;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * Filtro de autenticación JWT que se ejecuta en cada petición.
+ * 
+ * Obtiene el token de:
+ * 1. Cookie HttpOnly access_token (preferente para aplicaciones web)
+ * 2. Header Authorization: Bearer <token> (fallback para apps móviles)
+ * 
+ * Valida el token en dos niveles:
+ * - Firma y expiración (JwtService)
+ * - Estado en base de datos (expirado/revocado)
+ * 
+ * Si es válido, establece el SecurityContext con el usuario y sus roles.
+ */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -32,14 +46,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        final String authHeader = request.getHeader("Authorization");
+        // Obtener token desde cookie httpOnly (preferente) o header Authorization (fallback)
+        String token = CookieUtil.getAccessToken(request);
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (token == null) {
+            final String authHeader = request.getHeader("Authorization");
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                token = authHeader.substring(7);
+            }
+        }
+
+        if (token == null) {
             filterChain.doFilter(request, response);
             return;
         }
-
-        String token = authHeader.substring(7);
 
         try {
             var storedToken = tokenRepository.findByToken(token).orElse(null);

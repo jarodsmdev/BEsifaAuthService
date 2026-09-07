@@ -23,17 +23,33 @@ import com.evecta.auth.dto.auth.ChangePasswordRequestDTO;
 import com.evecta.auth.dto.auth.LoginRequestDTO;
 import com.evecta.auth.dto.auth.PasswordRecoveryRequestDTO;
 import com.evecta.auth.dto.auth.PasswordResetRequestDTO;
+import com.evecta.auth.dto.auth.SessionStatusDTO;
 import com.evecta.auth.dto.token.refresh.RefreshTokenRequestDTO;
 import com.evecta.auth.dto.token.refresh.RefreshTokenResponseDTO;
 import com.evecta.auth.model.UserEntity;
 import com.evecta.auth.model.UserRole;
 import com.evecta.auth.repository.ITokenRepository;
 import com.evecta.auth.service.AuthService;
+import com.evecta.auth.util.CookieUtil;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Controller de autenticación.
+ * 
+ * Endpoints perimetrales para autenticación y manejo de sesiones JWT.
+ * 
+ * Seguridad de tokens:
+ * - Los tokens se almacenan como cookies HttpOnly, no accesibles desde JavaScript.
+ * - Se usa SameSite=Strict para mitigar CSRF.
+ * - El frontend solo recibe datos del usuario, nunca los tokens.
+ * 
+ * @see CookieUtil para el manejo de cookies
+ */
 @RestController
 @RequestMapping("/auth/api/v1")
 @Tag(
@@ -46,13 +62,27 @@ public class AuthController {
     private final AuthService authService;
     private final ITokenRepository tokenRepository;
 
-    // LOGIN
+    /**
+     * Inicia sesión de un usuario.
+     * 
+     * Establece cookies HttpOnly con los tokens de acceso y refresco.
+     * Retorna la información del usuario (sin tokens) en el body JSON.
+     * 
+     * Cookies establecidas:
+     * - access_token: Token JWT, válido en todo el dominio
+     * - refresh_token: Token opaco, válido solo en /auth/api/v1
+     * 
+     * @param loginRequest Credenciales del usuario (email, password)
+     * @param clientOrigin Origen del cliente ("web" o "app")
+     * @param response Respuesta HTTP donde se establecen las cookies
+     * @return Información del usuario autenticado
+     */
     @Operation(
             summary = "Iniciar sesión",
-            description = "Autentica un usuario y retorna access token + refresh token")
+            description = "Autentica un usuario y establece cookies HttpOnly con los tokens de acceso y refresco")
     @ApiResponse(
             responseCode = "200",
-            description = "Login exitoso",
+            description = "Login exitoso. Se establecen cookies HttpOnly.",
             content = @Content(
                     mediaType = "application/json",
                     schema = @Schema(implementation = AuthResponseDTO.class)
@@ -61,64 +91,154 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponseDTO> login(
             @Valid @RequestBody LoginRequestDTO loginRequest,
-            @RequestHeader("X-Client-Origin") String clientOrigin) {
+            @RequestHeader("X-Client-Origin") String clientOrigin,
+            HttpServletResponse response) {
 
         log.info("Login request: {} from origin: {}", loginRequest.getEmail(), clientOrigin);
 
-        return ResponseEntity.ok(authService.login(loginRequest, clientOrigin));
+        AuthService.LoginResult result = authService.login(loginRequest, clientOrigin);
+
+        // Establecer tokens como cookies HttpOnly
+        CookieUtil.setAccessTokenCookie(response, result.accessToken());
+        CookieUtil.setRefreshTokenCookie(response, result.refreshToken());
+
+        log.info("Login exitoso para usuario: {}", result.userResponse().getEmail());
+        return ResponseEntity.ok(result.userResponse());
     }
 
-    // LOGOUT
+    /**
+     * Cierra la sesión del usuario.
+     * 
+     * Obtiene el token desde la cookie access_token (o el header Authorization
+     * como fallback para apps móviles), lo revoca en la base de datos y
+     * limpia las cookies HttpOnly de la respuesta.
+     * 
+     * @param request Petición HTTP (para leer la cookie)
+     * @param response Respuesta HTTP (para limpiar las cookies)
+     * @param authHeader Header Authorization opcional (fallback para apps móviles)
+     * @return Mensaje de confirmación
+     */
     @Operation(
             summary = "Cerrar sesión",
-            description = "Revoca el token actual",
+            description = "Revoca el token actual y limpia las cookies HttpOnly",
             security = @SecurityRequirement(name = "bearerAuth"))
     @PostMapping("/logout")
     public ResponseEntity<?> logout(
+            HttpServletRequest request,
+            HttpServletResponse response,
             @Parameter(
-                    description = "JWT Bearer Token",
-                    required = true,
+                    description = "JWT Bearer Token (opcional, fallback para apps móviles)",
+                    required = false,
                     example = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false)
             String authHeader) {
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            log.info("Logout fallido: Authorization header inválido");
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Authorization header inválido"));
+        // Obtener token desde cookie (preferente) o header (fallback)
+        String token = CookieUtil.getAccessToken(request);
+        boolean fromCookie = token != null;
+
+        if (token == null && authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
         }
 
-        log.info("Logout request");
-        authService.logout(authHeader);
+        if (token == null) {
+            log.info("Logout fallido: no se encontró token en cookie ni header");
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "No se encontró token de sesión"));
+        }
+
+        log.info("Logout request (origen token: {})", fromCookie ? "cookie" : "header");
+
+        try {
+            authService.logout(token);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            log.warn("Logout con token inválido: {}", e.getMessage());
+            // No fallamos el logout, simplemente limpiamos las cookies
+        }
+
+        // Limpiar cookies HttpOnly de la respuesta
+        CookieUtil.clearAccessTokenCookie(response);
+        CookieUtil.clearRefreshTokenCookie(response);
 
         log.info("Logout exitoso");
         return ResponseEntity.ok(
                 Map.of("message", "Logout successful"));
     }
 
-    // VALIDATE SESSION
+    /**
+     * Verifica el estado de la sesión.
+     * 
+     * Este endpoint lee el access token de la cookie y valida si la sesión
+     * es válida. Se usa al cargar la aplicación para restaurar la sesión
+     * sin necesidad de que el frontend tenga acceso al token.
+     * 
+     * @param request Petición HTTP (para leer la cookie access_token)
+     * @return SessionStatusDTO con el estado de la sesión
+     */
+    @Operation(
+            summary = "Verificar estado de sesión",
+            description = "Valida la sesión actual leyendo el token de la cookie httpOnly. Usado por el frontend para restaurar sesiones.")
+    @GetMapping("/status")
+    public ResponseEntity<SessionStatusDTO> sessionStatus(HttpServletRequest request) {
+
+        String token = CookieUtil.getAccessToken(request);
+
+        if (token == null) {
+            log.info("Status: no hay cookie de sesión");
+            return ResponseEntity.ok(
+                    SessionStatusDTO.builder()
+                            .valid(false)
+                            .error("No hay sesión activa")
+                            .build());
+        }
+
+        log.info("Status: validando sesión");
+        SessionStatusDTO status = authService.validateSession(token);
+
+        return ResponseEntity.ok(status);
+    }
+
+    /**
+     * Valida si un token es válido.
+     * 
+     * Endpoint interno usado por el API Gateway para validar tokens.
+     * Acepta el token desde el header Authorization (usado por el gateway)
+     * o desde la cookie access_token (para validación directa).
+     * 
+     * @param request Petición HTTP (para leer la cookie)
+     * @param authHeader Header Authorization (usado por el gateway)
+     * @return Estado de validación del token
+     */
     @Operation(
             summary = "Validar token",
             description = "Valida si el token JWT es válido, no expirado y no revocado",
             security = @SecurityRequirement(name = "bearerAuth"))
     @GetMapping("/validate")
     public ResponseEntity<?> validate(
+            HttpServletRequest request,
             @Parameter(
                     description = "JWT Bearer Token",
-                    required = true,
+                    required = false,
                     example = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false)
             String authHeader) {
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            log.info("Validación fallida: Authorization header inválido o ausente");
+        // Obtener token desde header (preferente, usado por el gateway) o cookie
+        String token = null;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        } else {
+            token = CookieUtil.getAccessToken(request);
+        }
+
+        if (token == null) {
+            log.info("Validación fallida: no se encontró token");
             return ResponseEntity.badRequest().body(
                     Map.of(
                             "valid", false,
-                            "error", "Authorization header inválido o ausente"));
+                            "error", "Token no proporcionado"));
         }
 
-        String token = authHeader.substring(7);
         log.info("Validación de token solicitada");
 
         var storedToken = tokenRepository.findByToken(token).orElse(null);
@@ -158,13 +278,23 @@ public class AuthController {
                         "roles", resolveRoles(storedToken.getUser())));
     }
 
-    // REFRESH TOKEN
+    /**
+     * Renueva los tokens de acceso.
+     * 
+     * Lee el refresh token de la cookie refresh_token, valida su vigencia,
+     * genera un nuevo par de tokens y los establece como nuevas cookies.
+     * 
+     * @param request Petición HTTP (para leer la cookie refresh_token)
+     * @param response Respuesta HTTP (para establecer nuevas cookies)
+     * @param requestBody Cuerpo opcional con refreshToken (fallback retrocompatible)
+     * @return Información del usuario renovada
+     */
     @Operation(
             summary = "Renovar access token",
-            description = "Genera un nuevo access token usando un refresh token válido")
+            description = "Genera un nuevo access token usando el refresh token de la cookie httpOnly")
     @ApiResponse(
             responseCode = "200",
-            description = "Token renovado correctamente",
+            description = "Token renovado correctamente. Se establecen nuevas cookies.",
             content = @Content(
                     mediaType = "application/json",
                     schema = @Schema(implementation = RefreshTokenResponseDTO.class)
@@ -172,12 +302,45 @@ public class AuthController {
     )
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponseDTO> refresh(
-            @RequestBody RefreshTokenRequestDTO request) {
+            HttpServletRequest request,
+            HttpServletResponse response,
+            @RequestBody(required = false) RefreshTokenRequestDTO requestBody) {
+
+        // Obtener refresh token desde cookie (preferente) o request body (fallback)
+        String refreshToken = CookieUtil.getRefreshToken(request);
+
+        if (refreshToken == null && requestBody != null) {
+            refreshToken = requestBody.refreshToken();
+        }
+
+        if (refreshToken == null) {
+            log.info("Refresh fallido: no se encontró refresh token en cookie ni body");
+            return ResponseEntity.badRequest()
+                    .body(buildErrorResponse("No se encontró refresh token"));
+        }
 
         log.info("Refresh token solicitado");
-        var response = authService.refresh(request.refreshToken());
+        AuthService.RefreshResult result = authService.refresh(refreshToken);
+
+        // Establecer nuevos tokens como cookies HttpOnly
+        CookieUtil.setAccessTokenCookie(response, result.accessToken());
+        CookieUtil.setRefreshTokenCookie(response, result.refreshToken());
+
         log.info("Refresh token exitoso");
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(result.userResponse());
+    }
+
+    /**
+     * Construye una respuesta de error con el mensaje dado.
+     * 
+     * @param message Mensaje de error
+     * @return AuthResponseDTO vacío (el error se maneja con código HTTP)
+     */
+    private AuthResponseDTO buildErrorResponse(String message) {
+        return AuthResponseDTO.builder()
+                .authType("error")
+                .roles(List.of())
+                .build();
     }
 
     // SOLICITAR RECUPERACIÓN DE CONTRASEÑA
