@@ -37,6 +37,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -61,11 +62,40 @@ class AuthControllerTest {
     private JwtService jwtService;
 
     @Test
-    void login_conDatosValidos_retorna200YEstableceCookies() throws Exception {
+    void login_web_conDatosValidos_retorna200YEstableceCookiesSinTokensBody() throws Exception {
         LoginRequestDTO request = TestDataBuilder.createLoginRequest("test@example.com", "TestPass123");
         AuthResponseDTO response = TestDataBuilder.createAuthResponseDTO();
         AuthService.LoginResult loginResult = new AuthService.LoginResult(
-                response, "access-token-value", "refresh-token-value");
+                response, "access-token-value", "refresh-token-value", "test@example.com", 1000L, 2000L);
+
+        when(authService.login(any(LoginRequestDTO.class), anyString())).thenReturn(loginResult);
+
+        mockMvc.perform(post("/auth/api/v1/login")
+                        .header("X-Client-Origin", "web")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(header().exists(HttpHeaders.SET_COOKIE))
+                .andExpect(jsonPath("$.email").value("test@example.com"))
+                .andExpect(jsonPath("$.roles").isArray())
+                // Verificar que NO se exponen tokens en el body JSON
+                .andExpect(jsonPath("$.accessToken").doesNotExist())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist());
+    }
+
+    @Test
+    void login_mobile_conDatosValidos_retornaTokensEnBodySinCookies() throws Exception {
+        LoginRequestDTO request = TestDataBuilder.createLoginRequest("fiscalizador@test.com", "TestPass123");
+        AuthResponseDTO response = AuthResponseDTO.builder()
+                .email("fiscalizador@test.com")
+                .name("Test")
+                .lastname("User")
+                .rut("12345678")
+                .roles(List.of("USER_APP"))
+                .authType("cookie")
+                .build();
+        AuthService.LoginResult loginResult = new AuthService.LoginResult(
+                response, "mobile-access-token", "mobile-refresh-token", "fiscalizador@test.com", 1111L, 2222L);
 
         when(authService.login(any(LoginRequestDTO.class), anyString())).thenReturn(loginResult);
 
@@ -74,11 +104,16 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.email").value("test@example.com"))
-                .andExpect(jsonPath("$.roles").isArray())
-                // Verificar que NO se exponen tokens en el body JSON
-                .andExpect(jsonPath("$.accessToken").doesNotExist())
-                .andExpect(jsonPath("$.refreshToken").doesNotExist());
+                // App móvil no recibe cookies
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
+                // Los tokens viajan en el body (compatibilidad con SDK móvil)
+                .andExpect(jsonPath("$.accessToken").value("mobile-access-token"))
+                .andExpect(jsonPath("$.refreshToken").value("mobile-refresh-token"))
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.sub").value("fiscalizador@test.com"))
+                .andExpect(jsonPath("$.iat").value(1111))
+                .andExpect(jsonPath("$.exp").value(2222))
+                .andExpect(jsonPath("$.roles").isArray());
     }
 
     @Test
@@ -167,13 +202,14 @@ class AuthControllerTest {
     void refresh_conCookieValida_retorna200() throws Exception {
         AuthResponseDTO response = TestDataBuilder.createAuthResponseDTO();
         AuthService.RefreshResult refreshResult = new AuthService.RefreshResult(
-                response, "new-access-token", "new-refresh-token");
+                response, "new-access-token", "new-refresh-token", "test@example.com", 1000L, 2000L);
 
         when(authService.refresh(anyString())).thenReturn(refreshResult);
 
         mockMvc.perform(post("/auth/api/v1/refresh")
                         .cookie(new jakarta.servlet.http.Cookie("refresh_token", "test-refresh-token")))
                 .andExpect(status().isOk())
+                .andExpect(header().exists(HttpHeaders.SET_COOKIE))
                 .andExpect(jsonPath("$.email").value("test@example.com"))
                 .andExpect(jsonPath("$.roles").isArray())
                 // Verificar que NO se exponen tokens en el body JSON
@@ -184,11 +220,11 @@ class AuthControllerTest {
     }
 
     @Test
-    void refresh_conBody_retorna200() throws Exception {
+    void refresh_mobile_conBody_retornaTokensEnBody() throws Exception {
         RefreshTokenRequestDTO request = new RefreshTokenRequestDTO("test-refresh-token");
         AuthResponseDTO response = TestDataBuilder.createAuthResponseDTO();
         AuthService.RefreshResult refreshResult = new AuthService.RefreshResult(
-                response, "new-access-token", "new-refresh-token");
+                response, "new-mobile-access", "new-mobile-refresh", "test@example.com", 1000L, 2000L);
 
         when(authService.refresh(anyString())).thenReturn(refreshResult);
 
@@ -196,7 +232,15 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.email").value("test@example.com"));
+                // App móvil no recibe cookies
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
+                // Los tokens rotados viajan en el body
+                .andExpect(jsonPath("$.accessToken").value("new-mobile-access"))
+                .andExpect(jsonPath("$.refreshToken").value("new-mobile-refresh"))
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.sub").value("test@example.com"))
+                .andExpect(jsonPath("$.iat").value(1000))
+                .andExpect(jsonPath("$.exp").value(2000));
 
         verify(authService).refresh("test-refresh-token");
     }

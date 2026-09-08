@@ -117,6 +117,10 @@ class AuthServiceTest {
         // El resultado contiene los tokens internos
         assertNotNull(result.accessToken());
         assertNotNull(result.refreshToken());
+        // Y los claims del JWT (sub/iat/exp) para clientes móviles
+        assertEquals(TEST_EMAIL, result.sub());
+        assertEquals(1000L, result.iat());
+        assertEquals(2000L, result.exp());
         // Y la respuesta del usuario sin tokens
         assertNotNull(result.userResponse());
         assertEquals(activeUser.getEmail(), result.userResponse().getEmail());
@@ -173,6 +177,9 @@ class AuthServiceTest {
         assertNotNull(result);
         assertEquals(appTokenData.token(), result.accessToken());
         assertEquals(List.of("USER_APP"), result.userResponse().getRoles());
+        assertEquals(appTokenData.sub(), result.sub());
+        assertEquals(appTokenData.iat(), result.iat());
+        assertEquals(appTokenData.exp(), result.exp());
     }
 
     @Test
@@ -211,6 +218,10 @@ class AuthServiceTest {
         // Contiene los nuevos tokens internamente
         assertNotNull(result.accessToken());
         assertNotNull(result.refreshToken());
+        // Y los claims del JWT (sub/iat/exp) para clientes móviles
+        assertEquals(TEST_EMAIL, result.sub());
+        assertEquals(1000L, result.iat());
+        assertEquals(2000L, result.exp());
         // Y la respuesta del usuario sin tokens
         assertNotNull(result.userResponse());
         assertEquals(activeUser.getEmail(), result.userResponse().getEmail());

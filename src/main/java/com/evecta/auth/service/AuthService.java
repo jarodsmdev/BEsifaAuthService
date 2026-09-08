@@ -62,10 +62,19 @@ public class AuthService {
    * Resultado del login que contiene tanto la respuesta del usuario como los tokens.
    * 
    * @param userResponse DTO con información del usuario (para el frontend)
-   * @param accessToken Token JWT de acceso (para cookie HttpOnly)
-   * @param refreshToken Refresh token opaco (para cookie HttpOnly)
+   * @param accessToken Token JWT de acceso (para cookie HttpOnly o body móvil)
+   * @param refreshToken Refresh token opaco (para cookie HttpOnly o body móvil)
+   * @param sub Asunto del token (email del usuario)
+   * @param iat Timestamp de emisión del token (epoch seconds)
+   * @param exp Timestamp de expiración del token (epoch seconds)
    */
-  public record LoginResult(AuthResponseDTO userResponse, String accessToken, String refreshToken) {
+  public record LoginResult(
+      AuthResponseDTO userResponse,
+      String accessToken,
+      String refreshToken,
+      String sub,
+      Long iat,
+      Long exp) {
   }
 
   /**
@@ -123,7 +132,13 @@ public class AuthService {
         AuditAction.LOGIN.name(),
         java.util.Map.of("Estado", "Exitoso", "rol", user.getRole().name()));
 
-    return new LoginResult(userResponse, tokens.accessToken(), tokens.refreshToken());
+    return new LoginResult(
+        userResponse,
+        tokens.accessToken(),
+        tokens.refreshToken(),
+        tokens.sub(),
+        tokens.iat(),
+        tokens.exp());
   }
 
   /**
@@ -287,7 +302,12 @@ public class AuthService {
 
     String refreshToken = generateRefreshToken();
 
-    return new TokenData(tokenData.token(), refreshToken);
+    return new TokenData(
+        tokenData.token(),
+        refreshToken,
+        tokenData.sub(),
+        tokenData.iat(),
+        tokenData.exp());
   }
 
   /**
@@ -314,10 +334,13 @@ public class AuthService {
   /**
    * Record interno para encapsular los tokens generados.
    * 
-   * @param accessToken  Token JWT de acceso
+   * @param accessToken Token JWT de acceso
    * @param refreshToken Refresh token opaco
+   * @param sub Asunto del token (email del usuario)
+   * @param iat Timestamp de emisión del token (epoch seconds)
+   * @param exp Timestamp de expiración del token (epoch seconds)
    */
-  private record TokenData(String accessToken, String refreshToken) {
+  private record TokenData(String accessToken, String refreshToken, String sub, Long iat, Long exp) {
   }
 
   private String generateRefreshToken() {
@@ -361,10 +384,19 @@ public class AuthService {
    * Resultado del refresh que contiene tanto la respuesta del usuario como los tokens.
    * 
    * @param userResponse DTO con información del usuario (para el frontend)
-   * @param accessToken Nuevo token JWT de acceso (para cookie HttpOnly)
-   * @param refreshToken Nuevo refresh token opaco (para cookie HttpOnly)
+   * @param accessToken Nuevo token JWT de acceso (para cookie HttpOnly o body móvil)
+   * @param refreshToken Nuevo refresh token opaco (para cookie HttpOnly o body móvil)
+   * @param sub Asunto del token (email del usuario)
+   * @param iat Timestamp de emisión del token (epoch seconds)
+   * @param exp Timestamp de expiración del token (epoch seconds)
    */
-  public record RefreshResult(AuthResponseDTO userResponse, String accessToken, String refreshToken) {
+  public record RefreshResult(
+      AuthResponseDTO userResponse,
+      String accessToken,
+      String refreshToken,
+      String sub,
+      Long iat,
+      Long exp) {
   }
 
   /**
@@ -422,7 +454,13 @@ public class AuthService {
     // Construir respuesta del usuario
     AuthResponseDTO userResponse = buildUserResponse(user);
 
-    return new RefreshResult(userResponse, tokens.accessToken(), tokens.refreshToken());
+    return new RefreshResult(
+        userResponse,
+        tokens.accessToken(),
+        tokens.refreshToken(),
+        tokens.sub(),
+        tokens.iat(),
+        tokens.exp());
   }
 
   @Transactional
