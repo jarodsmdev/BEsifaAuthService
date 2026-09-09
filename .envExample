@@ -36,6 +36,9 @@ BCRYPT_STRENGTH=10
 JWT_SECRET=tu_clave_secreta_para_jwt
 JWT_EXPIRATION_SECONDS=3600 # 1 hora
 JWT_REFRESH_EXPIRATION_SECONDS=86400 # 1 día
+# Claims estándar para validación en servicios downstream
+JWT_ISSUER=issuer_para_jwt
+JWT_AUDIENCE=audience_para_jwt
 
 # ============================================
 # SMTP MAIL CONFIG (Servidor de envío de correos para recuperar contraseñas)
