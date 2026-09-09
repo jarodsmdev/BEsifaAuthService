@@ -21,11 +21,11 @@ import org.springframework.web.bind.annotation.*;
 import com.evecta.auth.dto.auth.AuthResponseDTO;
 import com.evecta.auth.dto.auth.ChangePasswordRequestDTO;
 import com.evecta.auth.dto.auth.LoginRequestDTO;
+import com.evecta.auth.dto.auth.MobileAuthResponseDTO;
 import com.evecta.auth.dto.auth.PasswordRecoveryRequestDTO;
 import com.evecta.auth.dto.auth.PasswordResetRequestDTO;
 import com.evecta.auth.dto.auth.SessionStatusDTO;
 import com.evecta.auth.dto.token.refresh.RefreshTokenRequestDTO;
-import com.evecta.auth.dto.token.refresh.RefreshTokenResponseDTO;
 import com.evecta.auth.model.UserEntity;
 import com.evecta.auth.model.UserRole;
 import com.evecta.auth.repository.ITokenRepository;
@@ -65,31 +65,30 @@ public class AuthController {
     /**
      * Inicia sesión de un usuario.
      * 
-     * Establece cookies HttpOnly con los tokens de acceso y refresco.
-     * Retorna la información del usuario (sin tokens) en el body JSON.
-     * 
-     * Cookies establecidas:
-     * - access_token: Token JWT, válido en todo el dominio
-     * - refresh_token: Token opaco, válido solo en /auth/api/v1
+     * Según el origen del cliente:
+     * - Web (navegador): establece cookies HttpOnly con los tokens de acceso y
+     *   refresco. El body solo contiene la información del usuario.
+     * - Mobile (app nativa): no puede usar cookies, por lo que recibe los
+     *   tokens y claims (sub/iat/exp) directamente en el body JSON.
      * 
      * @param loginRequest Credenciales del usuario (email, password)
-     * @param clientOrigin Origen del cliente ("web" o "app")
-     * @param response Respuesta HTTP donde se establecen las cookies
-     * @return Información del usuario autenticado
+     * @param clientOrigin Origen del cliente ("web" o "mobile")
+     * @param response Respuesta HTTP donde se establecen las cookies (solo web)
+     * @return Información del usuario autenticado (web) o tokens + usuario (mobile)
      */
     @Operation(
             summary = "Iniciar sesión",
-            description = "Autentica un usuario y establece cookies HttpOnly con los tokens de acceso y refresco")
+            description = "Autentica un usuario. En web establece cookies HttpOnly; en app móvil retorna los tokens en el body")
     @ApiResponse(
             responseCode = "200",
-            description = "Login exitoso. Se establecen cookies HttpOnly.",
+            description = "Login exitoso",
             content = @Content(
                     mediaType = "application/json",
-                    schema = @Schema(implementation = AuthResponseDTO.class)
+                    schema = @Schema(oneOf = {AuthResponseDTO.class, MobileAuthResponseDTO.class})
             )
     )
     @PostMapping("/login")
-    public ResponseEntity<AuthResponseDTO> login(
+    public ResponseEntity<?> login(
             @Valid @RequestBody LoginRequestDTO loginRequest,
             @RequestHeader("X-Client-Origin") String clientOrigin,
             HttpServletResponse response) {
@@ -98,7 +97,18 @@ public class AuthController {
 
         AuthService.LoginResult result = authService.login(loginRequest, clientOrigin);
 
-        // Establecer tokens como cookies HttpOnly
+        // Clientes móviles (app nativa) no pueden usar cookies HttpOnly:
+        // se retornan los tokens en el body directamente.
+        if (isMobileClient(clientOrigin)) {
+            MobileAuthResponseDTO mobileResponse = buildMobileResponse(
+                    result.accessToken(), result.refreshToken(), result.sub(), result.iat(), result.exp(),
+                    result.userResponse().getRoles());
+
+            log.info("Login exitoso para usuario móvil: {}", result.userResponse().getEmail());
+            return ResponseEntity.ok(mobileResponse);
+        }
+
+        // Clientes web: los tokens viajan en cookies HttpOnly
         CookieUtil.setAccessTokenCookie(response, result.accessToken());
         CookieUtil.setRefreshTokenCookie(response, result.refreshToken());
 
@@ -281,33 +291,37 @@ public class AuthController {
     /**
      * Renueva los tokens de acceso.
      * 
-     * Lee el refresh token de la cookie refresh_token, valida su vigencia,
-     * genera un nuevo par de tokens y los establece como nuevas cookies.
+     * Según el origen del cliente:
+     * - Web: lee el refresh token de la cookie refresh_token, rota los tokens y
+     *   los establece como nuevas cookies (body solo con datos del usuario).
+     * - Mobile: envía el refresh token en el body (las cookies no aplican), por
+     *   lo que se retornan los nuevos tokens en el body JSON.
      * 
      * @param request Petición HTTP (para leer la cookie refresh_token)
-     * @param response Respuesta HTTP (para establecer nuevas cookies)
-     * @param requestBody Cuerpo opcional con refreshToken (fallback retrocompatible)
-     * @return Información del usuario renovada
+     * @param response Respuesta HTTP (para establecer nuevas cookies, solo web)
+     * @param requestBody Cuerpo opcional con refreshToken (fallback para apps móviles)
+     * @return Información del usuario renovada (web) o tokens renovados (mobile)
      */
     @Operation(
             summary = "Renovar access token",
-            description = "Genera un nuevo access token usando el refresh token de la cookie httpOnly")
+            description = "Genera un nuevo access token usando el refresh token de la cookie httpOnly (web) o del body (app móvil)")
     @ApiResponse(
             responseCode = "200",
-            description = "Token renovado correctamente. Se establecen nuevas cookies.",
+            description = "Token renovado correctamente",
             content = @Content(
                     mediaType = "application/json",
-                    schema = @Schema(implementation = RefreshTokenResponseDTO.class)
+                    schema = @Schema(oneOf = {AuthResponseDTO.class, MobileAuthResponseDTO.class})
             )
     )
     @PostMapping("/refresh")
-    public ResponseEntity<AuthResponseDTO> refresh(
+    public ResponseEntity<?> refresh(
             HttpServletRequest request,
             HttpServletResponse response,
             @RequestBody(required = false) RefreshTokenRequestDTO requestBody) {
 
-        // Obtener refresh token desde cookie (preferente) o request body (fallback)
+        // Obtener refresh token desde cookie (preferente, clientes web) o request body (apps móviles)
         String refreshToken = CookieUtil.getRefreshToken(request);
+        boolean fromCookie = refreshToken != null;
 
         if (refreshToken == null && requestBody != null) {
             refreshToken = requestBody.refreshToken();
@@ -319,14 +333,24 @@ public class AuthController {
                     .body(buildErrorResponse("No se encontró refresh token"));
         }
 
-        log.info("Refresh token solicitado");
+        log.info("Refresh token solicitado (origen token: {})", fromCookie ? "cookie" : "body");
         AuthService.RefreshResult result = authService.refresh(refreshToken);
 
-        // Establecer nuevos tokens como cookies HttpOnly
+        // Cliente móvil: retornar los tokens rotados en el body (no usa cookies)
+        if (!fromCookie) {
+            MobileAuthResponseDTO mobileResponse = buildMobileResponse(
+                    result.accessToken(), result.refreshToken(), result.sub(), result.iat(), result.exp(),
+                    result.userResponse().getRoles());
+
+            log.info("Refresh token exitoso para usuario móvil: {}", result.userResponse().getEmail());
+            return ResponseEntity.ok(mobileResponse);
+        }
+
+        // Cliente web: establecer nuevos tokens como cookies HttpOnly
         CookieUtil.setAccessTokenCookie(response, result.accessToken());
         CookieUtil.setRefreshTokenCookie(response, result.refreshToken());
 
-        log.info("Refresh token exitoso");
+        log.info("Refresh token exitoso para usuario: {}", result.userResponse().getEmail());
         return ResponseEntity.ok(result.userResponse());
     }
 
@@ -340,6 +364,53 @@ public class AuthController {
         return AuthResponseDTO.builder()
                 .authType("error")
                 .roles(List.of())
+                .build();
+    }
+
+    /**
+     * Determina si el cliente es una app móvil nativa.
+     * 
+     * Las apps móviles no pueden usar cookies HttpOnly, por lo que reciben
+     * los tokens directamente en el body JSON.
+     * 
+     * @param clientOrigin Valor del header X-Client-Origin
+     * @return true si el cliente es móvil/app
+     */
+    private boolean isMobileClient(String clientOrigin) {
+        return "mobile".equalsIgnoreCase(clientOrigin) || "app".equalsIgnoreCase(clientOrigin);
+    }
+
+    /**
+     * Construye la respuesta de autenticación para clientes móviles.
+     * 
+     * Incluye los tokens y sus claims (sub/iat/exp) en el body JSON, ya que
+     * una app nativa no puede leer las cookies HttpOnly. El formato replica
+     * la respuesta original del backend para compatibilidad con el SDK móvil.
+     * 
+     * @param accessToken Token JWT de acceso
+     * @param refreshToken Refresh token opaco
+     * @param sub Asunto del token (email del usuario)
+     * @param iat Timestamp de emisión (epoch seconds)
+     * @param exp Timestamp de expiración (epoch seconds)
+     * @param roles Roles del usuario
+     * @return MobileAuthResponseDTO con tokens y claims
+     */
+    private MobileAuthResponseDTO buildMobileResponse(
+            String accessToken,
+            String refreshToken,
+            String sub,
+            Long iat,
+            Long exp,
+            List<String> roles) {
+
+        return MobileAuthResponseDTO.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .tokenType("Bearer")
+                .sub(sub)
+                .iat(iat)
+                .exp(exp)
+                .roles(roles)
                 .build();
     }
 
