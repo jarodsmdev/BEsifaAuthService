@@ -23,6 +23,7 @@ import com.evecta.auth.model.UserEntity;
 import com.evecta.auth.model.UserRole;
 import com.evecta.auth.repository.ITokenRepository;
 import com.evecta.auth.repository.IUserRepository;
+import com.evecta.auth.util.TokenHashUtil;
 import java.util.Random;
 
 import lombok.RequiredArgsConstructor;
@@ -30,15 +31,12 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * Servicio de autenticación.
- * 
- * Responsabilidades:
- * - Login/logout de usuarios
- * - Generación y rotación de tokens (access + refresh)
- * - Validación de sesiones
- * - Gestión de recuperación de contraseñas
- * 
- * Los tokens se almacenan como cookies HttpOnly para mayor seguridad.
- * El frontend nunca tiene acceso directo a los tokens.
+ *
+ * <p>Responsabilidades: - Login/logout de usuarios - Generación y rotación de tokens (access +
+ * refresh) - Validación de sesiones - Gestión de recuperación de contraseñas
+ *
+ * <p>Los tokens se almacenan como cookies HttpOnly para mayor seguridad. El frontend nunca tiene
+ * acceso directo a los tokens.
  */
 @Service
 @RequiredArgsConstructor
@@ -52,15 +50,15 @@ public class AuthService {
   private final EmailService emailService;
   private final AuditoriaService auditoriaService;
 
-  @Value("${app.jwt.expiration-seconds:3600}")
+  @Value("${app.jwt.expiration-seconds}")
   private long expirationSeconds;
 
-  @Value("${app.jwt.refresh-expiration-seconds:86400}")
+  @Value("${app.jwt.refresh-expiration-seconds}")
   private long refreshExpirationSeconds;
 
   /**
    * Resultado del login que contiene tanto la respuesta del usuario como los tokens.
-   * 
+   *
    * @param userResponse DTO con información del usuario (para el frontend)
    * @param accessToken Token JWT de acceso (para cookie HttpOnly o body móvil)
    * @param refreshToken Refresh token opaco (para cookie HttpOnly o body móvil)
@@ -74,19 +72,14 @@ public class AuthService {
       String refreshToken,
       String sub,
       Long iat,
-      Long exp) {
-  }
+      Long exp) {}
 
   /**
    * Autentica un usuario y genera tokens de sesión.
-   * 
-   * Flujo:
-   * 1. Valida credenciales
-   * 2. Verifica que la cuenta esté activa
-   * 3. Bloquea acceso web para usuarios móviles (USER_APP)
-   * 4. Genera tokens y los guarda en BD
-   * 5. Registra auditoría
-   * 
+   *
+   * <p>Flujo: 1. Valida credenciales 2. Verifica que la cuenta esté activa 3. Bloquea acceso web
+   * para usuarios móviles (USER_APP) 4. Genera tokens y los guarda en BD 5. Registra auditoría
+   *
    * @param loginRequest Credenciales del usuario
    * @param clientOrigin Origen del cliente ("web" o "app")
    * @return LoginResult con tokens y datos del usuario
@@ -119,7 +112,10 @@ public class AuthService {
     revokeAllUserTokens(user);
     TokenData tokens = generateTokens(user);
     saveAccessToken(user, tokens.accessToken());
-    saveRefreshToken(user, tokens.refreshToken());
+
+    // Iniciar una nueva familia de rotación para esta sesión
+    String familyId = Token.generateFamilyId();
+    saveRefreshToken(user, tokens.refreshToken(), familyId);
 
     // Construir respuesta del usuario
     AuthResponseDTO userResponse = buildUserResponse(user);
@@ -143,11 +139,10 @@ public class AuthService {
 
   /**
    * Revoca todos los tokens activos del usuario.
-   * 
-   * Este método marca como expirados Y revocados todos los tokens
-   * no expirados y no revocados del usuario. Se usa para implementar
-   * la política de "una sola sesión activa por usuario".
-   * 
+   *
+   * <p>Este método marca como expirados Y revocados todos los tokens no expirados y no revocados
+   * del usuario. Se usa para implementar la política de "una sola sesión activa por usuario".
+   *
    * @param user Usuario cuyos tokens serán revocados
    */
   public void revokeAllUserTokens(UserEntity user) {
@@ -167,7 +162,7 @@ public class AuthService {
 
   /**
    * Cierra la sesión de un usuario revocando el token proporcionado.
-   * 
+   *
    * @param token Token a revocar (puede venir de cookie o header Authorization)
    * @throws IllegalArgumentException si el token es inválido
    * @throws IllegalStateException si el token ya está invalidado
@@ -200,70 +195,53 @@ public class AuthService {
 
   /**
    * Valida una sesión desde un token y retorna el estado de la sesión.
-   * 
-   * Este método es utilizado por el endpoint /status para verificar
-   * si la sesión del usuario es válida.
-   * 
+   *
+   * <p>Este método es utilizado por el endpoint /status para verificar si la sesión del usuario es
+   * válida.
+   *
    * @param token Token JWT a validar
    * @return SessionStatusDTO con el estado de la sesión
    */
   public SessionStatusDTO validateSession(String token) {
 
     if (token == null || token.isBlank()) {
-      return SessionStatusDTO.builder()
-          .valid(false)
-          .error("No hay token de sesión")
-          .build();
+      return SessionStatusDTO.builder().valid(false).error("No hay token de sesión").build();
     }
 
     // Validar firma y expiración del JWT
     if (!jwtService.isTokenValid(token)) {
-      return SessionStatusDTO.builder()
-          .valid(false)
-          .error("Token inválido o expirado")
-          .build();
+      return SessionStatusDTO.builder().valid(false).error("Token inválido o expirado").build();
     }
 
     // Verificar en base de datos
     var storedToken = tokenRepository.findByToken(token).orElse(null);
 
     if (storedToken == null) {
-      return SessionStatusDTO.builder()
-          .valid(false)
-          .error("Token no encontrado")
-          .build();
+      return SessionStatusDTO.builder().valid(false).error("Token no encontrado").build();
     }
 
     if (storedToken.isExpired()) {
-      return SessionStatusDTO.builder()
-          .valid(false)
-          .error("Sesión expirada")
-          .build();
+      return SessionStatusDTO.builder().valid(false).error("Sesión expirada").build();
     }
 
     if (storedToken.isRevoked()) {
-      return SessionStatusDTO.builder()
-          .valid(false)
-          .error("Sesión revocada")
-          .build();
+      return SessionStatusDTO.builder().valid(false).error("Sesión revocada").build();
     }
 
     // Sesión válida - construir información del usuario
     UserEntity user = storedToken.getUser();
     List<String> roles = resolveRoles(user);
 
-    SessionStatusDTO.UserInfo userInfo = SessionStatusDTO.UserInfo.builder()
-        .email(user.getEmail())
-        .name(user.getName())
-        .lastname(user.getLastName())
-        .rut(user.getFullRut())
-        .roles(roles)
-        .build();
+    SessionStatusDTO.UserInfo userInfo =
+        SessionStatusDTO.UserInfo.builder()
+            .email(user.getEmail())
+            .name(user.getName())
+            .lastname(user.getLastName())
+            .rut(user.getFullRut())
+            .roles(roles)
+            .build();
 
-    return SessionStatusDTO.builder()
-        .valid(true)
-        .user(userInfo)
-        .build();
+    return SessionStatusDTO.builder().valid(true).user(userInfo).build();
   }
 
   private List<String> resolveRoles(UserEntity user) {
@@ -290,7 +268,7 @@ public class AuthService {
 
   /**
    * Genera los tokens (access + refresh) para un usuario.
-   * 
+   *
    * @param user Usuario para el que se generan los tokens
    * @return TokenData con el access token JWT y refresh token opaco
    */
@@ -303,17 +281,13 @@ public class AuthService {
     String refreshToken = generateRefreshToken();
 
     return new TokenData(
-        tokenData.token(),
-        refreshToken,
-        tokenData.sub(),
-        tokenData.iat(),
-        tokenData.exp());
+        tokenData.token(), refreshToken, tokenData.sub(), tokenData.iat(), tokenData.exp());
   }
 
   /**
-   * Construye la respuesta del DTO con la información del usuario.
-   * Los tokens NO se incluyen en el DTO (se establecen como cookies HttpOnly).
-   * 
+   * Construye la respuesta del DTO con la información del usuario. Los tokens NO se incluyen en el
+   * DTO (se establecen como cookies HttpOnly).
+   *
    * @param user Usuario autenticado
    * @return AuthResponseDTO con información del usuario
    */
@@ -333,15 +307,15 @@ public class AuthService {
 
   /**
    * Record interno para encapsular los tokens generados.
-   * 
+   *
    * @param accessToken Token JWT de acceso
    * @param refreshToken Refresh token opaco
    * @param sub Asunto del token (email del usuario)
    * @param iat Timestamp de emisión del token (epoch seconds)
    * @param exp Timestamp de expiración del token (epoch seconds)
    */
-  private record TokenData(String accessToken, String refreshToken, String sub, Long iat, Long exp) {
-  }
+  private record TokenData(
+      String accessToken, String refreshToken, String sub, Long iat, Long exp) {}
 
   private String generateRefreshToken() {
     SecureRandom secureRandom = new SecureRandom();
@@ -365,12 +339,66 @@ public class AuthService {
     tokenRepository.save(token);
   }
 
-  private void saveRefreshToken(UserEntity user, String refreshToken) {
+  /**
+   * Guarda un refresh token en la BD únicamente como hash SHA-256.
+   *
+   * <p>El token en texto plano NUNCA se persiste. Solo se almacena:
+   * <ul>
+   *   <li>{@code tokenHash}: SHA-256(token) en hexadecimal, determinístico para
+   *       permitir búsqueda directa {@link ITokenRepository#findByTokenHash(String)}</li>
+   *   <li>{@code familyId}: UUID que agrupa la cadena de rotación</li>
+   * </ul>
+   *
+   * <p>Si la BD es comprometida, el atacante solo obtiene hashes (unidireccionales)
+   * inutilizables: no puede derivar el valor original ni emitir tokens con ellos.
+   *
+   * @param user Usuario propietario del token
+   * @param refreshToken Refresh token opaco en texto plano (solo se hashea)
+   * @param familyId Identificador de la familia de rotación (persistente entre rotaciones)
+   */
+  private void saveRefreshToken(UserEntity user, String refreshToken, String familyId) {
+
+    // Calcular hash unidireccional y determinístico
+    String tokenHash = TokenHashUtil.hashToken(refreshToken);
 
     Token token =
         Token.builder()
             .user(user)
-            .token(refreshToken)
+            .tokenHash(tokenHash)
+            .familyId(familyId)
+            .tokenType(Token.TokenType.REFRESH)
+            .expired(false)
+            .revoked(false)
+            .expiresAt(LocalDateTime.now().plusSeconds(refreshExpirationSeconds))
+            .build();
+
+    tokenRepository.save(token);
+  }
+
+  /**
+   * Guarda un refresh token rotado, registrando el hash del token que reemplazó.
+   *
+   * <p>El campo {@code replacedByTokenHash} permite detectar reutilización:
+   * si el token original se vuelve a enviar después de una rotación, se detecta
+   * que ya fue reemplazado (posible compromiso).
+   *
+   * @param user Usuario propietario del token
+   * @param refreshToken Nuevo refresh token en texto plano (solo se hashea)
+   * @param familyId Identificador de la familia de rotación
+   * @param replacedTokenHash Hash del refresh token que este token reemplaza
+   */
+  private void saveRotatedRefreshToken(
+      UserEntity user, String refreshToken, String familyId, String replacedTokenHash) {
+
+    // Calcular hash unidireccional y determinístico
+    String tokenHash = TokenHashUtil.hashToken(refreshToken);
+
+    Token token =
+        Token.builder()
+            .user(user)
+            .tokenHash(tokenHash)
+            .familyId(familyId)
+            .replacedByTokenHash(replacedTokenHash)
             .tokenType(Token.TokenType.REFRESH)
             .expired(false)
             .revoked(false)
@@ -382,7 +410,7 @@ public class AuthService {
 
   /**
    * Resultado del refresh que contiene tanto la respuesta del usuario como los tokens.
-   * 
+   *
    * @param userResponse DTO con información del usuario (para el frontend)
    * @param accessToken Nuevo token JWT de acceso (para cookie HttpOnly o body móvil)
    * @param refreshToken Nuevo refresh token opaco (para cookie HttpOnly o body móvil)
@@ -396,41 +424,73 @@ public class AuthService {
       String refreshToken,
       String sub,
       Long iat,
-      Long exp) {
-  }
+      Long exp) {}
 
   /**
    * Renueva los tokens usando un refresh token válido.
-   * 
-   * Este método implementa la rotación de refresh tokens:
-   * 1. Valida el refresh token actual
-   * 2. Revoca TODOS los tokens del usuario (incluyendo el actual)
-   * 3. Genera un nuevo par de tokens (access + refresh)
-   * 4. Guarda los nuevos tokens en la base de datos
-   * 
-   * @param refreshToken Refresh token actual a renovar
+   *
+   * <p>Este método implementa las siguientes protecciones de seguridad:
+   * <ul>
+   *   <li><b>Hashing:</b> el refresh token se busca por su hash SHA-256, nunca en texto plano</li>
+   *   <li><b>Rotación:</b> cada uso genera un nuevo refresh token; el anterior queda revocado
+   *       y marcado con el hash del reemplazo ({@code replacedByTokenHash})</li>
+   *   <li><b>Detección de reutilización:</b> si un refresh token ya reemplazado se vuelve a usar,
+   *       se trata como un posible compromiso y se revoca TODA la familia de tokens</li>
+   * </ul>
+   *
+   * @param refreshToken Refresh token actual a renovar (texto plano enviado por el cliente)
    * @return RefreshResult con nuevos tokens y datos del usuario
-   * @throws IllegalArgumentException si el token es inválido
+   * @throws IllegalArgumentException si el token es inválido o se detecta reutilización
    * @throws IllegalStateException si el token está expirado o revocado
    */
   @Transactional
   public RefreshResult refresh(String refreshToken) {
 
-    Token storedToken =
-        tokenRepository
-            .findByToken(refreshToken)
-            .orElseThrow(() -> new IllegalArgumentException("Refresh token inválido"));
+    if (refreshToken == null || refreshToken.isBlank()) {
+      throw new IllegalArgumentException("Refresh token inválido");
+    }
 
+    // 1. Buscar el token en BD por su hash (nunca por texto plano)
+    String tokenHash = TokenHashUtil.hashToken(refreshToken);
+    Token storedToken = tokenRepository.findByTokenHash(tokenHash).orElse(null);
+
+    if (storedToken == null) {
+      // El token no existe en BD (expiró la sesión completa o nunca se emitió)
+      throw new IllegalArgumentException("Refresh token inválido");
+    }
+
+    // 2. DETECCIÓN DE REUTILIZACIÓN:
+    //    Si este token YA fue reemplazado (replacedByTokenHash != null) y alguien
+    //    lo vuelve a enviar, significa que fue clonado, robado o reutilizado.
+    if (storedToken.getReplacedByTokenHash() != null) {
+      String email =
+          storedToken.getUser() != null ? storedToken.getUser().getEmail() : "desconocido";
+      log.warn("Posible ROBO/REUSO de refresh token detectado para usuario: {}", email);
+
+      // Un token reutilizado implica que el original pudo ser clonado:
+      // se revoca toda la familia para invalidar la sesión completa.
+      revokeTokenFamilyByToken(storedToken);
+
+      // Auditar el incidente de seguridad
+      auditoriaService.registrarAccion(
+          email,
+          AuditAction.LOGOUT.name(),
+          java.util.Map.of(
+              "Motivo",
+              "Reutilización de refresh token detectada: se revocó toda la familia de tokens"));
+
+      throw new IllegalArgumentException(
+          "Refresh token inválido. Se detectó un posible uso indebido del token.");
+    }
+
+    // 3. VALIDACIÓN estándar del token
     if (storedToken.isExpired() || storedToken.isRevoked()) {
       throw new IllegalStateException("Refresh token inválido");
     }
 
     if (storedToken.getExpiresAt().isBefore(LocalDateTime.now())) {
-
       storedToken.setExpired(true);
-
       tokenRepository.save(storedToken);
-
       throw new IllegalStateException("Refresh token expirado");
     }
 
@@ -440,16 +500,24 @@ public class AuthService {
 
     UserEntity user = storedToken.getUser();
 
-    // REVOCAR TOKENS ANTERIORES
+    // 4. ROTACIÓN: marcar el token actual como expirado y revocado
+    //    (un refresh token se usa UNA sola vez)
+    storedToken.setExpired(true);
+    storedToken.setRevoked(true);
+    tokenRepository.save(storedToken);
+
+    // 5. Revocar los demás tokens activos del usuario (política de una sesión activa)
     revokeAllUserTokens(user);
 
-    // GENERAR NUEVOS TOKENS
+    // 6. GENERAR NUEVO PAR DE TOKENS (rotación completa)
     TokenData tokens = generateTokens(user);
 
-    // GUARDAR NUEVOS TOKENS
+    // Guardar nuevo access token (JWT, se valida por firma)
     saveAccessToken(user, tokens.accessToken());
 
-    saveRefreshToken(user, tokens.refreshToken());
+    // Guardar nuevo refresh token en la MISMA familia, registrando el reemplazo
+    String previousHash = storedToken.getTokenHash();
+    saveRotatedRefreshToken(user, tokens.refreshToken(), storedToken.getFamilyId(), previousHash);
 
     // Construir respuesta del usuario
     AuthResponseDTO userResponse = buildUserResponse(user);
@@ -461,6 +529,46 @@ public class AuthService {
         tokens.sub(),
         tokens.iat(),
         tokens.exp());
+  }
+
+  /**
+   * Revoca TODA la familia de tokens de un usuario a partir de un token detectado.
+   *
+   * <p>Cuando se detecta la reutilización de un refresh token (posible compromiso),
+   * se revocan todos los tokens que comparten el {@code familyId}. Esto incluye
+   * tokens de acceso y refresh de la misma sesión, forzando al usuario a
+   * autenticarse nuevamente.
+   *
+   * @param detectedToken Token que se detectó como reutilizado (pertenece a la familia a revocar)
+   */
+  private void revokeTokenFamilyByToken(Token detectedToken) {
+
+    if (detectedToken.getFamilyId() == null) {
+      log.warn(
+          "Token sin familyId detectado (id={}); revocando solo el token individual",
+          detectedToken.getIdToken());
+
+      detectedToken.setRevoked(true);
+      detectedToken.setExpired(true);
+      tokenRepository.save(detectedToken);
+      return;
+    }
+
+    List<Token> familyTokens = tokenRepository.findAllByFamilyId(detectedToken.getFamilyId());
+
+    if (!familyTokens.isEmpty()) {
+      familyTokens.forEach(
+          token -> {
+            token.setRevoked(true);
+            token.setExpired(true);
+          });
+      tokenRepository.saveAll(familyTokens);
+
+      log.warn(
+          "Revocada familia de tokens '{}' ({} tokens) por detección de reutilización",
+          detectedToken.getFamilyId(),
+          familyTokens.size());
+    }
   }
 
   @Transactional
@@ -502,11 +610,14 @@ public class AuthService {
   public void changePassword(String email, ChangePasswordRequestDTO request) {
     log.info("Cambio de contraseña solicitado para: {}", email);
 
-    UserEntity user = userRepository.findByEmail(email)
-        .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+    UserEntity user =
+        userRepository
+            .findByEmail(email)
+            .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
     if (!user.isActive()) {
-      throw new IllegalArgumentException("Esta cuenta se encuentra inactiva. Contacte al administrador.");
+      throw new IllegalArgumentException(
+          "Esta cuenta se encuentra inactiva. Contacte al administrador.");
     }
 
     if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
@@ -526,7 +637,13 @@ public class AuthService {
     auditoriaService.registrarAccion(
         user.getEmail(),
         AuditAction.CAMBIO_CLAVE.name(),
-        java.util.Map.of("Estado", "Exitoso", "Motivo", "Cambio voluntario desde app móvil", "sesiones_antiguas_revocadas", true));
+        java.util.Map.of(
+            "Estado",
+            "Exitoso",
+            "Motivo",
+            "Cambio voluntario desde app móvil",
+            "sesiones_antiguas_revocadas",
+            true));
   }
 
   @Transactional(noRollbackFor = IllegalArgumentException.class)

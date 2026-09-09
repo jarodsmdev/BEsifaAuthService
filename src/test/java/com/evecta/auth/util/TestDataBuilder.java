@@ -56,6 +56,33 @@ public final class TestDataBuilder {
                 .build();
     }
 
+    /**
+     * Crea un refresh token con su hash SHA-256.
+     *
+     * <p>Simula el comportamiento real: el valor en texto plano se hashea con
+     * {@link TokenHashUtil} y NUNCA se persiste en la entidad (campo {@code token} null).
+     *
+     * @param rawValue    Valor en texto plano del refresh token (solo para cálculo del hash)
+     * @param user        Usuario propietario
+     * @param revoked     Estado revocado
+     * @param expired     Estado expirado
+     * @param familyId    Identificador de la familia de rotación
+     * @return Token con tokenHash y familyId configurados
+     */
+    public static Token createRefreshToken(String rawValue, UserEntity user, boolean revoked, boolean expired, String familyId) {
+        return Token.builder()
+                .tokenHash(TokenHashUtil.hashToken(rawValue))
+                .tokenType(Token.TokenType.REFRESH)
+                .familyId(familyId)
+                .revoked(revoked)
+                .expired(expired)
+                .user(user)
+                .expiresAt(LocalDateTime.now().plusHours(24))
+                .createdAt(LocalDateTime.now())
+                .modifiedAt(LocalDateTime.now())
+                .build();
+    }
+
     public static UserCreateDTO createUserCreateDTO() {
         return UserCreateDTO.builder()
                 .rut("11111111")

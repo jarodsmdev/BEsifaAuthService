@@ -29,7 +29,11 @@ public class TokenResponseDTO {
 
     public static TokenResponseDTO fromEntity(Token token) {
 
-        String tokenValue = token.getToken();
+        // Para access tokens (BEARER): el JWT se almacena en texto plano y se enmascara al mostrarlo.
+        // Para refresh tokens: solo se almacena el hash SHA-256; el texto plano nunca se persiste.
+        String tokenValue = token.getTokenHash() != null
+                ? token.getTokenHash()
+                : token.getToken();
 
         // Esta linea enmascara el token dejando solo los primeros 5 caracteres visibles y el resto reemplazado por asteriscos
         String maskedToken = tokenValue != null && tokenValue.length() > 5
