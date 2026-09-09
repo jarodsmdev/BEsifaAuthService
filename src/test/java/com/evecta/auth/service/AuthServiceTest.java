@@ -30,6 +30,7 @@ import com.evecta.auth.model.UserRole;
 import com.evecta.auth.repository.ITokenRepository;
 import com.evecta.auth.repository.IUserRepository;
 import com.evecta.auth.util.TestDataBuilder;
+import com.evecta.auth.util.TokenHashUtil;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -202,17 +203,20 @@ class AuthServiceTest {
 
     @Test
     void refresh_conTokenValido_emiteNuevosTokens() {
-        Token refreshTokenEntity = TestDataBuilder.createToken(activeUser, Token.TokenType.REFRESH, false, false);
+        String rawRefreshToken = "valid-refresh-token";
+        Token refreshTokenEntity = TestDataBuilder.createRefreshToken(
+                rawRefreshToken, activeUser, false, false, "family-1");
         refreshTokenEntity.setExpiresAt(LocalDateTime.now().plusHours(1));
 
-        when(tokenRepository.findByToken("valid-refresh-token")).thenReturn(Optional.of(refreshTokenEntity));
+        when(tokenRepository.findByTokenHash(TokenHashUtil.hashToken(rawRefreshToken)))
+                .thenReturn(Optional.of(refreshTokenEntity));
         when(tokenRepository.findAllByUser_RutAndExpiredFalseAndRevokedFalse(activeUser.getRut()))
                 .thenReturn(List.of());
         when(jwtService.generateToken(eq(activeUser), eq(List.of("USER_ADMIN")), eq(List.of())))
                 .thenReturn(authTokenData);
         when(tokenRepository.save(any(Token.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        AuthService.RefreshResult result = authService.refresh("valid-refresh-token");
+        AuthService.RefreshResult result = authService.refresh(rawRefreshToken);
 
         assertNotNull(result);
         // Contiene los nuevos tokens internamente
@@ -225,15 +229,57 @@ class AuthServiceTest {
         // Y la respuesta del usuario sin tokens
         assertNotNull(result.userResponse());
         assertEquals(activeUser.getEmail(), result.userResponse().getEmail());
+
+        // Verificar la ROTACIÓN: el token original debe quedar revocado y expirado
+        assertTrue(refreshTokenEntity.isExpired());
+        assertTrue(refreshTokenEntity.isRevoked());
     }
 
     @Test
     void refresh_conTokenRevocado_lanzaExcepcion() {
-        Token revokedToken = TestDataBuilder.createToken(activeUser, Token.TokenType.REFRESH, true, false);
+        String rawRefreshToken = "revoked-refresh-token";
+        Token revokedToken = TestDataBuilder.createRefreshToken(
+                rawRefreshToken, activeUser, true, false, "family-2");
+        revokedToken.setExpiresAt(LocalDateTime.now().plusHours(1));
 
-        when(tokenRepository.findByToken("revoked-refresh-token")).thenReturn(Optional.of(revokedToken));
+        when(tokenRepository.findByTokenHash(TokenHashUtil.hashToken(rawRefreshToken)))
+                .thenReturn(Optional.of(revokedToken));
 
-        assertThrows(IllegalStateException.class, () -> authService.refresh("revoked-refresh-token"));
+        assertThrows(IllegalStateException.class, () -> authService.refresh(rawRefreshToken));
+    }
+
+    @Test
+    void refresh_conTokenReutilizado_revocaTodaLaFamiliaYLanzaExcepcion() {
+        // Simula un token YA rotado: tiene replacedByTokenHash != null,
+        // por lo que volver a usarlo indica un posible compromiso.
+        String rawRefreshToken = "reused-refresh-token";
+        Token reusedToken = TestDataBuilder.createRefreshToken(
+                rawRefreshToken, activeUser, false, false, "family-comprometida");
+        reusedToken.setExpiresAt(LocalDateTime.now().plusHours(1));
+        reusedToken.setReplacedByTokenHash("hash-del-reemplazo");
+
+        Token otherFamilyMember = TestDataBuilder.createRefreshToken(
+                "otro-miembro", activeUser, false, false, "family-comprometida");
+        otherFamilyMember.setExpiresAt(LocalDateTime.now().plusHours(1));
+
+        when(tokenRepository.findByTokenHash(TokenHashUtil.hashToken(rawRefreshToken)))
+                .thenReturn(Optional.of(reusedToken));
+        when(tokenRepository.findAllByFamilyId("family-comprometida"))
+                .thenReturn(List.of(reusedToken, otherFamilyMember));
+
+        assertThrows(IllegalArgumentException.class, () -> authService.refresh(rawRefreshToken));
+
+        // DETECCIÓN: toda la familia debe quedar revocada y expirada
+        assertTrue(reusedToken.isRevoked());
+        assertTrue(reusedToken.isExpired());
+        assertTrue(otherFamilyMember.isRevoked());
+        assertTrue(otherFamilyMember.isExpired());
+
+        // Y se audita el incidente de seguridad
+        verify(auditoriaService).registrarAccion(
+                eq(TEST_EMAIL),
+                eq("LOGOUT"),
+                any(Map.class));
     }
 
     @Test

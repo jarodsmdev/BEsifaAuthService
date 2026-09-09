@@ -12,6 +12,7 @@ import org.springframework.data.domain.PageRequest;
 import com.evecta.auth.model.Token;
 import com.evecta.auth.model.UserEntity;
 import com.evecta.auth.model.UserRole;
+import com.evecta.auth.util.TokenHashUtil;
 
 @DataJpaTest
 @DisplayName("ITokenRepository")
@@ -67,6 +68,16 @@ class ITokenRepositoryTest {
         expiredToken.setExpiresAt(LocalDateTime.now().minusDays(1));
         expiredToken.setUser(user);
         tokenRepository.save(expiredToken);
+
+        Token refreshToken = new Token();
+        refreshToken.setTokenHash(TokenHashUtil.hashToken("raw-refresh-token-value"));
+        refreshToken.setTokenType(Token.TokenType.REFRESH);
+        refreshToken.setFamilyId("family-test");
+        refreshToken.setRevoked(false);
+        refreshToken.setExpired(false);
+        refreshToken.setExpiresAt(LocalDateTime.now().plusDays(1));
+        refreshToken.setUser(user);
+        tokenRepository.save(refreshToken);
     }
 
     @Test
@@ -84,18 +95,47 @@ class ITokenRepositoryTest {
     }
 
     @Test
+    @DisplayName("findByTokenHash con hash de refresh token lo encuentra")
+    void findByTokenHash_hashExistente_retornaToken() {
+        String hash = TokenHashUtil.hashToken("raw-refresh-token-value");
+        var found = tokenRepository.findByTokenHash(hash);
+        assertThat(found).isPresent();
+        assertThat(found.get().getTokenType()).isEqualTo(Token.TokenType.REFRESH);
+        // El texto plano NUNCA se persiste
+        assertThat(found.get().getToken()).isNull();
+    }
+
+    @Test
+    @DisplayName("findByTokenHash con hash inexistente retorna vacío")
+    void findByTokenHash_hashInexistente_retornaVacio() {
+        var found = tokenRepository.findByTokenHash("hash-inexistente");
+        assertThat(found).isEmpty();
+    }
+
+    @Test
+    @DisplayName("findAllByFamilyId retorna los tokens de la familia")
+    void findAllByFamilyId_retornaMiembros() {
+        List<Token> familyTokens = tokenRepository.findAllByFamilyId("family-test");
+        assertThat(familyTokens).hasSize(1);
+        assertThat(familyTokens.get(0).getFamilyId()).isEqualTo("family-test");
+    }
+
+    @Test
     @DisplayName("findAllByUser_RutAndExpiredFalseAndRevokedFalse solo retorna tokens válidos")
     void findAllValidTokens_soloValidos() {
+        // BEARER válido + REFRESH válido (sin revocar ni expirar)
         List<Token> tokens = tokenRepository.findAllByUser_RutAndExpiredFalseAndRevokedFalse("11111111");
-        assertThat(tokens).hasSize(1);
-        assertThat(tokens.get(0).getToken()).isEqualTo("valid-token-123");
+        assertThat(tokens).hasSize(2);
+        assertThat(tokens)
+                .extracting(Token::getTokenType)
+                .containsExactlyInAnyOrder(Token.TokenType.BEARER, Token.TokenType.REFRESH);
     }
 
     @Test
     @DisplayName("findAllByUser_Rut retorna todos los tokens del usuario")
     void findAllByUserRut_retornaTodos() {
         List<Token> tokens = tokenRepository.findAllByUser_Rut("11111111");
-        assertThat(tokens).hasSize(3);
+        assertThat(tokens).hasSize(4);
     }
 
     @Test
