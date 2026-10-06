@@ -4,6 +4,7 @@ import com.evecta.auth.service.InternalTokenService;
 import feign.Request;
 import feign.RequestInterceptor;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -17,7 +18,8 @@ import org.springframework.context.annotation.Configuration;
  *
  * Como core-sifa exige un token interno firmado ({@code X-Auth-Identity}) en toda
  * llamada directa, se inyecta un interceptor que firma cada request con el token
- * de corta duración y rol {@code USER_ADMIN} (requerido por el endpoint de auditoría).
+ * de corta duración y rol {@code USER_ADMIN} (requerido por el endpoint de auditoría),
+ * además de adjuntar la cabecera del canal interno {@code X-Internal-Key}.
  */
 @Configuration
 public class CoreAuditFeignConfig {
@@ -29,10 +31,18 @@ public class CoreAuditFeignConfig {
   }
 
   @Bean
-  public RequestInterceptor coreAuditAuthInterceptor(InternalTokenService internalTokenService) {
-    return requestTemplate ->
-        requestTemplate.header(
-            "X-Auth-Identity",
-            internalTokenService.generateToken("auth-service", List.of("USER_ADMIN")));
+  public RequestInterceptor coreAuditAuthInterceptor(
+      InternalTokenService internalTokenService,
+      @Value("${internal.channel.key:}") String channelKey) {
+    return requestTemplate -> {
+      requestTemplate.header(
+          "X-Auth-Identity",
+          internalTokenService.generateToken("auth-service", List.of("USER_ADMIN")));
+      // Core exige además la firma del canal interno: sin ella la llamada
+      // directa a su IP privada se descartaría con 403.
+      if (channelKey != null && !channelKey.isBlank()) {
+        requestTemplate.header("X-Internal-Key", channelKey.trim());
+      }
+    };
   }
 }
