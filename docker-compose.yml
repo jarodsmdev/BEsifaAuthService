@@ -8,11 +8,11 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: root_password_segura
-      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_DATABASE: ${DB_NAME_AUTH}
       MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "3306:3306"
+      - "127.0.0.1:3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
@@ -31,7 +31,9 @@ services:
     container_name: auth-api
     restart: unless-stopped
     ports:
-      - "8081:8080"
+      # Publicado solo en loopback: en producción el tráfico llega por la IP
+      # privada (ver deploy_SIFA-AUTH.sh), no por todas las interfaces.
+      - "127.0.0.1:8081:8080"
     environment:
       # Database
       DB_HOST: ${DB_HOST}
@@ -53,10 +55,16 @@ services:
       # JWT
       JWT_SECRET: ${JWT_SECRET}
       INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET}
+      INTERNAL_JWT_ISSUER: ${INTERNAL_JWT_ISSUER}
+      INTERNAL_JWT_AUDIENCE: ${INTERNAL_JWT_AUDIENCE}
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_AUDIENCE: ${JWT_AUDIENCE}
       JWT_EXPIRATION_SECONDS: 3600
       JWT_REFRESH_EXPIRATION_SECONDS: 86400
+
+      # Firma del canal interno: la exige ChannelKeyFilter (entrada) y la adjunta
+      # CoreAuditFeignConfig cuando auth llama a core (salida).
+      INTERNAL_CHANNEL_KEY: ${INTERNAL_CHANNEL_KEY:-}
 
       # SMTP Mail Config
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp.gmail.com}
